@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { ArrowLeft, Keyboard, Scissors, Sparkles } from "lucide-react";
+import { ArrowLeft, Keyboard, Paperclip, Scissors, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { PlayDetail } from "@/components/film/play-detail";
@@ -11,6 +11,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { Down, PlayFilter, PlayTag, Side, TagSource } from "@/lib/core/types";
 import { filterPlays, listConceptLabels } from "@/lib/core/cutups";
+import { playsToWebVttChapters } from "@/lib/core/webvtt";
+import {
+  getFilmMedia,
+  hasFilmMedia,
+  registerFilmMedia,
+} from "@/lib/media/media-registry";
 import { filmById, playsForFilm, usePlayiqStore } from "@/lib/store/playiq-store";
 
 export const Route = createFileRoute("/app/film/$filmId")({
@@ -68,11 +74,31 @@ function FilmReviewPage() {
   const reanalyzeFilm = usePlayiqStore((s) => s.reanalyzeFilm);
   const applyAiTagsForFilm = usePlayiqStore((s) => s.applyAiTagsForFilm);
   const createCutupFromFilter = usePlayiqStore((s) => s.createCutupFromFilter);
+  const hydrated = usePlayiqStore((s) => s.hydrated);
   const [tagging, setTagging] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  /** Bump to re-read media registry after attach */
+  const [mediaEpoch, setMediaEpoch] = useState(0);
 
   const film = useMemo(() => filmById(films, filmId), [films, filmId]);
   const plays = useMemo(() => playsForFilm(playsByFilm, filmId), [playsByFilm, filmId]);
+  const media = useMemo(() => {
+    void mediaEpoch;
+    void hydrated;
+    return getFilmMedia(filmId);
+  }, [filmId, mediaEpoch, hydrated]);
+
+  const vttUrl = useMemo(() => {
+    if (plays.length === 0) return null;
+    const vtt = playsToWebVttChapters(plays, { title: film?.title });
+    return URL.createObjectURL(new Blob([vtt], { type: "text/vtt" }));
+  }, [plays, film?.title]);
+
+  useEffect(() => {
+    return () => {
+      if (vttUrl) URL.revokeObjectURL(vttUrl);
+    };
+  }, [vttUrl]);
 
   const [side, setSide] = useState<Side | "all">("all");
   const [down, setDown] = useState<Down | "all">("all");
@@ -111,8 +137,9 @@ function FilmReviewPage() {
     if (selected) setCurrentSec(selected.startSec);
   }, [selected]);
 
+  // Demo stage clock (no local media)
   useEffect(() => {
-    if (!playing || !selected) return;
+    if (media || !playing || !selected) return;
     const tickMs = Math.max(50, Math.round(250 / speed));
     const step = 0.25 * speed;
     const id = window.setInterval(() => {
@@ -126,7 +153,7 @@ function FilmReviewPage() {
       });
     }, tickMs);
     return () => window.clearInterval(id);
-  }, [playing, selected, speed]);
+  }, [playing, selected, speed, media]);
 
   const stepPlay = useCallback(
     (dir: -1 | 1) => {
@@ -205,10 +232,30 @@ function FilmReviewPage() {
             <p className="mt-1 text-sm text-fg-muted">
               Week {film.week} · {film.date} · {film.venue} · {plays.length} plays
               {film.sourceFileName ? ` · ${film.sourceFileName}` : ""}
+              {hasFilmMedia(film.id) ? " · local media" : ""}
             </p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-[var(--radius-sm)] border border-transparent px-3 text-sm font-medium text-fg-muted hover:bg-bg-subtle hover:text-fg focus-within:outline focus-within:outline-2 focus-within:outline-offset-2">
+            <Paperclip className="h-4 w-4" />
+            {media ? "Replace media" : "Attach media"}
+            <input
+              type="file"
+              accept="video/*"
+              className="sr-only"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                registerFilmMedia(film.id, f, f.name);
+                setMediaEpoch((n) => n + 1);
+                toast.success("Local media attached", {
+                  description: `${f.name} — plays in the stage; cut assembly available.`,
+                });
+                e.target.value = "";
+              }}
+            />
+          </label>
           <Button
             type="button"
             variant="ghost"
@@ -272,9 +319,13 @@ function FilmReviewPage() {
         opponent={film.opponent}
         hue={film.thumbnailHue}
         currentSec={currentSec}
-        durationSec={film.durationSec}
+        durationSec={media ? Math.max(film.durationSec, currentSec + 1) : film.durationSec}
         playing={playing}
         speed={speed}
+        mediaUrl={media?.objectUrl}
+        vttUrl={vttUrl}
+        playStartSec={selected?.startSec}
+        playEndSec={selected?.endSec}
         onSpeedChange={setSpeed}
         playLabel={
           selected
@@ -284,6 +335,10 @@ function FilmReviewPage() {
         onToggle={() => setPlaying((p) => !p)}
         onPrev={() => stepPlay(-1)}
         onNext={() => stepPlay(1)}
+        onTimeUpdate={(t) => {
+          if (media) setCurrentSec(t);
+        }}
+        onEndedPlay={() => setPlaying(false)}
       />
 
       <FilmTimeline

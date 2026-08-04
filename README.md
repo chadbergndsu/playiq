@@ -15,7 +15,7 @@ PlayIQ is a Hudl-style film workflow wedge: upload/review season film, get an AI
 | **Landing** | Product pitch + market comparison + enter film room |
 | **Overview** | Season stats, recent film, top concepts |
 | **Film library** | Demo season + **Upload film** intake (metadata/file → processing → review) |
-| **Film review** | Timeline, deep filters (side/down/concept/source/starred), speeds 0.5–2×, AI + coach tags, notes, shortcuts (J/K/Space/S/?) |
+| **Film review** | **Real local video** when media attached (IndexedDB), WebVTT chapters, timeline, deep filters, speeds 0.5–2×, AI + coach tags, shortcuts |
 | **AI tagging** | **Re-run AI tags** → `POST /api/film/tag` (SpaceXAI when `XAI_API_KEY` set; heuristics otherwise). Coach tags never clobbered. |
 | **Cutups** | Teach reels: rename, remove plays, **share link**, CSV/JSON export |
 | **Public share** | `/share/$token` — no login required to view/export a published cutup |
