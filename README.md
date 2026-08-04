@@ -2,7 +2,14 @@
 
 AI-first football film analysis for coaches and programs.
 
-**Status:** Product demo live — film library, upload intake, AI tagging, review workspace, shareable cutups, export, tendency insights.
+**Status: LIVE v1.0.0** — production on Vercel + Neon.
+
+| | |
+|--|--|
+| **Production** | https://playiq-three.vercel.app |
+| **Team alias** | https://playiq-chadbergndsus-projects.vercel.app |
+| **Health** | https://playiq-three.vercel.app/api/health |
+| **Repo** | https://github.com/chadbergndsu/playiq |
 
 ## Purpose
 
@@ -122,24 +129,28 @@ docs/adr/           # Architecture decisions
 - [x] Basic health check (`GET /api/health`)
 - [x] Postgres (Neon) provisioned via Vercel Marketplace (`playiq-db`); migrations apply on build
 - [x] Dependabot enabled (`.github/dependabot.yml`)
-- [x] ADRs (`docs/adr/0001`–`0003`)
+- [x] ADRs (`docs/adr/0001`–`0006`)
 - [x] Auth via proven library (Better Auth)
+- [x] **v1.0.0 production go-live** (2026-08-04)
 
-### Production
+### Production (live)
 
 | Item | Value |
 |------|--------|
-| App | https://playiq-three.vercel.app |
-| Vercel project | `chadbergndsus-projects/playiq` |
+| **App** | https://playiq-three.vercel.app |
+| Team alias | https://playiq-chadbergndsus-projects.vercel.app |
+| Vercel project | `chadbergndsus-projects/playiq` (GitHub-connected) |
 | Database | Neon Free (`playiq-db`) → `DATABASE_URL` |
 | Share links | Durable via `cutup_shares` on Neon |
+| Health | `GET /api/health` → `status: ok`, version `1.0.0` |
+| HTTPS | Enforced by Vercel |
 
-### Still open (manual / later)
+### Optional next (not blocking go-live)
 
-1. **Branch protection:** GitHub Free private blocks classic protection (Pro/Team or Rulesets); require **`Lint · Typecheck · Test`**.
-2. **Sentry:** set `SENTRY_DSN` / `VITE_SENTRY_DSN` when ready.
-3. **SpaceXAI:** set `XAI_API_KEY` on Vercel for live LLM tagging.
-4. Custom domain (optional).
+1. **Branch protection** — GitHub Free private may block classic protection  
+2. **Sentry** — set `SENTRY_DSN` / `VITE_SENTRY_DSN`  
+3. **SpaceXAI** — set `XAI_API_KEY` for live LLM tagging  
+4. Custom domain (e.g. `app.playiq…`)
 
 ## Agent rules
 

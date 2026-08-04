@@ -8,7 +8,7 @@ export const Route = createFileRoute("/api/health")({
       GET: async () => {
         const report = buildHealthReport({
           service: "playiq",
-          version: "0.1.0",
+          version: "1.0.0",
           dbReady: true,
           xaiConfigured: isXaiConfigured(),
         });

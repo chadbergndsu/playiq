@@ -6,7 +6,7 @@ describe("buildHealthReport", () => {
   it("returns ok when all checks pass", () => {
     const report = buildHealthReport({
       service: "playiq",
-      version: "0.1.0",
+      version: "1.0.0",
       dbReady: true,
       xaiConfigured: true,
       now: new Date("2026-08-03T12:00:00.000Z"),
