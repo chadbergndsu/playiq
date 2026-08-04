@@ -8,6 +8,7 @@ describe("buildHealthReport", () => {
       service: "playiq",
       version: "0.1.0",
       dbReady: true,
+      xaiConfigured: true,
       now: new Date("2026-08-03T12:00:00.000Z"),
     });
 
@@ -15,6 +16,14 @@ describe("buildHealthReport", () => {
     assert.equal(report.service, "playiq");
     assert.equal(report.checks.process, "pass");
     assert.equal(report.checks.database, "pass");
+    assert.equal(report.checks.xai, "pass");
+    assert.equal(isHealthy(report), true);
+  });
+
+  it("stays ok when xAI key is missing (optional)", () => {
+    const report = buildHealthReport({ dbReady: true, xaiConfigured: false });
+    assert.equal(report.status, "ok");
+    assert.equal(report.checks.xai, "fail");
     assert.equal(isHealthy(report), true);
   });
 

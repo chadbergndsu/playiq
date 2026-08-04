@@ -1,8 +1,9 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { buildCutup } from "@/lib/core/cutups";
+import { playToSignal } from "@/lib/core/llm-tagging";
 import { seedFilms, seedPlaysForFilm, withTagCounts } from "@/lib/core/seed";
-import { applyAiToPlay } from "@/lib/core/tagging";
+import { applyAiToPlay, mergeTags } from "@/lib/core/tagging";
 import type {
   Cutup,
   Film,
@@ -71,6 +72,8 @@ export type PlayiqState = {
   setLibraryQuery: (q: string) => void;
   setLibraryStatus: (s: FilmStatus | "all") => void;
   reanalyzeFilm: (filmId: string) => void;
+  /** Merge server/LLM AI tags per play without clobbering coach tags. */
+  applyAiTagsForFilm: (filmId: string, playTags: Record<string, PlayTag[]>) => void;
   markFilmReady: (filmId: string) => void;
   createCutupFromFilter: (title: string, filmId: string | "all", filter: PlayFilter) => string;
   deleteCutup: (id: string) => void;
@@ -175,24 +178,29 @@ export const usePlayiqStore = create<PlayiqState>()(
       reanalyzeFilm: (filmId) => {
         set((state) => {
           const plays = (state.playsByFilm[filmId] ?? EMPTY_PLAYS).map((p) =>
-            applyAiToPlay(p, {
-              side: p.side,
-              down: p.down,
-              distance: p.distance,
-              yardLine: p.yardLine,
-              yardsGained: p.yardsGained,
-              visionHint:
-                p.side === "offense"
-                  ? "shotgun trips inside zone left"
-                  : p.side === "defense"
-                    ? "cover 3 sky pressure edge"
-                    : "punt formation",
-              isExplosive: (p.yardsGained ?? 0) >= 15,
-              isScore: p.result === "touchdown",
-              isTurnover: p.result === "turnover",
-              isSpecial: p.side === "special",
-            }),
+            applyAiToPlay(p, playToSignal(p)),
           );
+          const playsByFilm = { ...state.playsByFilm, [filmId]: plays };
+          const films = state.films.map((f) =>
+            f.id === filmId
+              ? {
+                  ...f,
+                  status: "ready" as const,
+                  aiProgress: 100,
+                }
+              : f,
+          );
+          return { playsByFilm, films: withTagCounts(films, playsByFilm) };
+        });
+      },
+
+      applyAiTagsForFilm: (filmId, playTags) => {
+        set((state) => {
+          const plays = (state.playsByFilm[filmId] ?? EMPTY_PLAYS).map((p) => {
+            const ai = playTags[p.id];
+            if (!ai || ai.length === 0) return p;
+            return { ...p, tags: mergeTags(p.tags, ai) };
+          });
           const playsByFilm = { ...state.playsByFilm, [filmId]: plays };
           const films = state.films.map((f) =>
             f.id === filmId

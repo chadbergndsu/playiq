@@ -16,6 +16,7 @@ PlayIQ is a Hudl-style film workflow wedge: upload/review season film, get an AI
 | **Overview** | Season stats, recent film, top concepts |
 | **Film library** | 8-game demo season, search/filter by status |
 | **Film review** | Timeline, play list, demo stage, AI + coach tags, notes, keyboard J/K/Space |
+| **AI tagging** | **Re-run AI tags** → `POST /api/film/tag` (SpaceXAI when `XAI_API_KEY` set; heuristics otherwise). Coach tags never clobbered. |
 | **Cutups** | Filtered teach reels (save from any film filter) |
 | **Insights** | Weekly charts, concept frequency, situation counts |
 | **Auth** | Better Auth (Google / X) — film room works without sign-in |
@@ -42,8 +43,21 @@ Demo data is seeded client-side (persisted in the browser). **Reset demo data** 
 # Node 22+
 npm ci
 cp .env.example .env   # optional for local tooling; never commit real secrets
+# Optional: set XAI_API_KEY in .env for real SpaceXAI play tagging
 npm run dev            # http://0.0.0.0:8080
 ```
+
+### AI tagging (SpaceXAI)
+
+| Mode | When | Behavior |
+|------|------|----------|
+| **LLM** | `XAI_API_KEY` set on the server | Batched chat completions (`grok-4.5` by default); structured JSON tags |
+| **Heuristic** | No key, or LLM error | Local rules in `src/lib/core/tagging.ts` (always available) |
+
+- Endpoint: `POST /api/film/tag` with `{ filmId, plays: [...] }`.
+- Response: `{ mode, playTags, xaiConfigured, warning? }`.
+- Health: `GET /api/health` reports `checks.xai` (`pass` if key present). Missing key does **not** degrade overall status.
+- Key is **server-only** — never put `XAI_API_KEY` in `VITE_*` vars.
 
 ### Scripts
 
@@ -63,7 +77,8 @@ npm run dev            # http://0.0.0.0:8080
 src/
   routes/           # Pages + API (landing, /app/*, auth, health)
   components/       # App shell, film UI, small UI primitives
-  lib/core/         # Framework-free domain: tagging, cutups, seed (unit-tested)
+  lib/core/         # Framework-free domain: tagging, LLM parse, cutups, seed
+  lib/server/       # Server-only: xAI tagger (API key never in client bundle)
   lib/store/        # Zustand demo state
   lib/auth/         # Better Auth (pre-wired; do not rewrite server.ts)
   lib/db.ts         # Postgres / PGLite access
@@ -73,7 +88,7 @@ docs/adr/           # Architecture decisions
 ```
 
 - Business logic that matters lives under `src/lib/core` so it stays testable.
-- Auth routes: `/login`, `/api/auth/*`. Health: `/api/health`.
+- Auth routes: `/login`, `/api/auth/*`. Health: `/api/health`. Film AI: `/api/film/tag`.
 - Deploy target is Vercel; schema migrations run on build via `npm run db:migrate`.
 
 ## Deploy
@@ -95,7 +110,7 @@ docs/adr/           # Architecture decisions
 - [x] Proper `.gitignore`
 - [x] Linter + formatter configured (ESLint + Prettier)
 - [x] TypeScript enabled
-- [x] Basic tests for core logic (health, tagging, cutups)
+- [x] Basic tests for core logic (health, tagging, LLM parse, xAI fallback, cutups)
 - [x] GitHub Actions CI (lint → typecheck → test) on PR/push to `main`
 - [x] Secrets only via platform env / GitHub Secrets (documented)
 - [ ] Error tracking (Sentry) live for production — placeholders in `.env.example`; wire on first real prod deploy

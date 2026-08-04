@@ -18,6 +18,7 @@ import { Route as AppCutupsRouteImport } from './routes/app/cutups'
 import { Route as AppInsightsRouteImport } from './routes/app/insights'
 import { Route as AppLibraryRouteImport } from './routes/app/library'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiFilmTagRouteImport } from './routes/api/film/tag'
 import { Route as AppCutupsCutupIdRouteImport } from './routes/app/cutups.$cutupId'
 import { Route as AppFilmFilmIdRouteImport } from './routes/app/film.$filmId'
 
@@ -66,6 +67,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiFilmTagRoute = ApiFilmTagRouteImport.update({
+  id: '/api/film/tag',
+  path: '/api/film/tag',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppCutupsCutupIdRoute = AppCutupsCutupIdRouteImport.update({
   id: '/$cutupId',
   path: '/$cutupId',
@@ -87,6 +93,7 @@ export interface FileRoutesByFullPath {
   '/app/library': typeof AppLibraryRoute
   '/app/': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/film/tag': typeof ApiFilmTagRoute
   '/app/cutups/$cutupId': typeof AppCutupsCutupIdRoute
   '/app/film/$filmId': typeof AppFilmFilmIdRoute
 }
@@ -99,6 +106,7 @@ export interface FileRoutesByTo {
   '/app/library': typeof AppLibraryRoute
   '/app': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/film/tag': typeof ApiFilmTagRoute
   '/app/cutups/$cutupId': typeof AppCutupsCutupIdRoute
   '/app/film/$filmId': typeof AppFilmFilmIdRoute
 }
@@ -113,6 +121,7 @@ export interface FileRoutesById {
   '/app/library': typeof AppLibraryRoute
   '/app/': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/film/tag': typeof ApiFilmTagRoute
   '/app/cutups/$cutupId': typeof AppCutupsCutupIdRoute
   '/app/film/$filmId': typeof AppFilmFilmIdRoute
 }
@@ -128,6 +137,7 @@ export interface FileRouteTypes {
     | '/app/library'
     | '/app/'
     | '/api/auth/$'
+    | '/api/film/tag'
     | '/app/cutups/$cutupId'
     | '/app/film/$filmId'
   fileRoutesByTo: FileRoutesByTo
@@ -140,6 +150,7 @@ export interface FileRouteTypes {
     | '/app/library'
     | '/app'
     | '/api/auth/$'
+    | '/api/film/tag'
     | '/app/cutups/$cutupId'
     | '/app/film/$filmId'
   id:
@@ -153,6 +164,7 @@ export interface FileRouteTypes {
     | '/app/library'
     | '/app/'
     | '/api/auth/$'
+    | '/api/film/tag'
     | '/app/cutups/$cutupId'
     | '/app/film/$filmId'
   fileRoutesById: FileRoutesById
@@ -163,6 +175,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiFilmTagRoute: typeof ApiFilmTagRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -230,6 +243,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/film/tag': {
+      id: '/api/film/tag'
+      path: '/api/film/tag'
+      fullPath: '/api/film/tag'
+      preLoaderRoute: typeof ApiFilmTagRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/app/cutups/$cutupId': {
       id: '/app/cutups/$cutupId'
       path: '/$cutupId'
@@ -283,6 +303,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiFilmTagRoute: ApiFilmTagRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -9,13 +9,51 @@ import { FilmTimeline } from "@/components/film/timeline";
 import { VideoStage } from "@/components/film/video-stage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { PlayFilter, Side } from "@/lib/core/types";
+import type { PlayFilter, PlayTag, Side } from "@/lib/core/types";
 import { filterPlays } from "@/lib/core/cutups";
 import { filmById, playsForFilm, usePlayiqStore } from "@/lib/store/playiq-store";
 
 export const Route = createFileRoute("/app/film/$filmId")({
   component: FilmReviewPage,
 });
+
+type TagApiResponse = {
+  filmId: string;
+  mode: "llm" | "heuristic";
+  xaiConfigured: boolean;
+  playTags: Record<string, PlayTag[]>;
+  warning?: string;
+  error?: string;
+};
+
+async function requestFilmTags(
+  filmId: string,
+  plays: ReturnType<typeof playsForFilm>,
+): Promise<TagApiResponse> {
+  const res = await fetch("/api/film/tag", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      filmId,
+      plays: plays.map((p) => ({
+        id: p.id,
+        side: p.side,
+        down: p.down,
+        distance: p.distance,
+        yardLine: p.yardLine,
+        yardsGained: p.yardsGained,
+        result: p.result,
+        notes: p.notes,
+        tags: p.tags,
+      })),
+    }),
+  });
+  const data = (await res.json()) as TagApiResponse;
+  if (!res.ok) {
+    throw new Error(data.error || `Tagging failed (${res.status})`);
+  }
+  return data;
+}
 
 function FilmReviewPage() {
   const { filmId } = Route.useParams();
@@ -27,7 +65,9 @@ function FilmReviewPage() {
   const removeTag = usePlayiqStore((s) => s.removeTag);
   const setPlayNote = usePlayiqStore((s) => s.setPlayNote);
   const reanalyzeFilm = usePlayiqStore((s) => s.reanalyzeFilm);
+  const applyAiTagsForFilm = usePlayiqStore((s) => s.applyAiTagsForFilm);
   const createCutupFromFilter = usePlayiqStore((s) => s.createCutupFromFilter);
+  const [tagging, setTagging] = useState(false);
 
   const film = useMemo(() => filmById(films, filmId), [films, filmId]);
   const plays = useMemo(() => playsForFilm(playsByFilm, filmId), [playsByFilm, filmId]);
@@ -144,15 +184,37 @@ function FilmReviewPage() {
           <Button
             type="button"
             variant="secondary"
+            disabled={tagging || plays.length === 0}
             onClick={() => {
-              reanalyzeFilm(film.id);
-              toast.success("AI re-analysis complete", {
-                description: "Coach tags preserved; AI tags refreshed.",
-              });
+              void (async () => {
+                setTagging(true);
+                try {
+                  const data = await requestFilmTags(film.id, plays);
+                  applyAiTagsForFilm(film.id, data.playTags);
+                  const via =
+                    data.mode === "llm"
+                      ? "SpaceXAI (xAI) tags applied"
+                      : "Local heuristic tags applied";
+                  toast.success("AI re-analysis complete", {
+                    description: data.warning
+                      ? `${via}. ${data.warning} Coach tags preserved.`
+                      : `${via}. Coach tags preserved.`,
+                  });
+                } catch (err) {
+                  // Offline / route not ready — keep film room usable
+                  reanalyzeFilm(film.id);
+                  const msg = err instanceof Error ? err.message : "Request failed";
+                  toast.message("Used offline heuristics", {
+                    description: `${msg}. Coach tags preserved.`,
+                  });
+                } finally {
+                  setTagging(false);
+                }
+              })();
             }}
           >
             <Sparkles className="h-4 w-4" />
-            Re-run AI tags
+            {tagging ? "Running AI…" : "Re-run AI tags"}
           </Button>
           <Button
             type="button"
