@@ -2,7 +2,7 @@
 
 AI-first football film analysis for coaches and programs.
 
-**Status: LIVE v1.0.0** — production on Vercel + Neon.
+**Status: LIVE v1.1.0** — production on Vercel + Neon.
 
 | | |
 |--|--|
@@ -22,11 +22,11 @@ PlayIQ is a Hudl-style film workflow wedge: upload/review season film, get an AI
 | **Landing** | Product pitch + market comparison + enter film room |
 | **Overview** | Season stats, recent film, top concepts |
 | **Film library** | Demo season + **Upload film** intake (metadata/file → processing → review) |
-| **Film review** | **Real local video** when media attached (IndexedDB), WebVTT chapters, timeline, deep filters, speeds 0.5–2×, AI + coach tags, shortcuts |
+| **Film review** | **Real local video** when media attached (IndexedDB), WebVTT chapters, timeline, deep filters, speeds 0.5–2×, **auto-advance**, AI + coach tags, shortcuts |
 | **AI tagging** | **Re-run AI tags** → `POST /api/film/tag` (SpaceXAI when `XAI_API_KEY` set; heuristics otherwise). Coach tags never clobbered. |
-| **Cutups** | Teach reels: rename, remove plays, **share link**, CSV/JSON export |
+| **Cutups / teach** | **Teach reel player** (auto-advance + loop), **install from stars**, share link, CSV/JSON, Mediabunny assemble |
 | **Public share** | `/share/$token` — no login required to view/export a published cutup |
-| **Insights** | Weekly charts, concepts, **formation tendencies**, 3rd-down conversion, down×distance matrix |
+| **Insights** | Weekly charts, tendencies, **scout report** (Markdown / HTML / print) with optional opponent filter |
 | **Exchange (open)** | OFP import/export, WebVTT round-trip, FFmpeg/EDL, ontology, SVG, **Mediabunny cut assembly**, **local vision → OFP** |
 | **Auth** | Better Auth (Google / X) — film room works without sign-in |
 
@@ -129,9 +129,10 @@ docs/adr/           # Architecture decisions
 - [x] Basic health check (`GET /api/health`)
 - [x] Postgres (Neon) provisioned via Vercel Marketplace (`playiq-db`); migrations apply on build
 - [x] Dependabot enabled (`.github/dependabot.yml`)
-- [x] ADRs (`docs/adr/0001`–`0006`)
+- [x] ADRs (`docs/adr/0001`–`0008`)
 - [x] Auth via proven library (Better Auth)
 - [x] **v1.0.0 production go-live** (2026-08-04)
+- [x] **v1.1.0 teach reel + scout report** (2026-08-04)
 
 ### Production (live)
 
@@ -142,7 +143,7 @@ docs/adr/           # Architecture decisions
 | Vercel project | `chadbergndsus-projects/playiq` (GitHub-connected) |
 | Database | Neon Free (`playiq-db`) → `DATABASE_URL` |
 | Share links | Durable via `cutup_shares` on Neon |
-| Health | `GET /api/health` → `status: ok`, version `1.0.0` |
+| Health | `GET /api/health` → `status: ok`, version `1.1.0` |
 | HTTPS | Enforced by Vercel |
 
 ### Optional next (not blocking go-live)

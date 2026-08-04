@@ -1,5 +1,5 @@
-import { Link, createFileRoute } from "@tanstack/react-router";
-import { Download, Link2, Scissors, Trash2 } from "lucide-react";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Download, Link2, Scissors, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cutupDurationSec } from "@/lib/core/cutups";
@@ -26,12 +26,15 @@ function downloadText(filename: string, text: string, type: string) {
 }
 
 function CutupsPage() {
+  const navigate = useNavigate();
   const cutups = usePlayiqStore((s) => s.cutups);
   const playsByFilm = usePlayiqStore((s) => s.playsByFilm);
   const films = usePlayiqStore((s) => s.films);
   const deleteCutup = usePlayiqStore((s) => s.deleteCutup);
   const ensureCutupShareToken = usePlayiqStore((s) => s.ensureCutupShareToken);
+  const createInstallCutupFromStars = usePlayiqStore((s) => s.createInstallCutupFromStars);
   const allPlays = Object.values(playsByFilm).flat();
+  const starredCount = allPlays.filter((p) => p.starred).length;
 
   async function shareCutup(cutupId: string) {
     const cut = cutups.find((c) => c.id === cutupId);
@@ -88,13 +91,37 @@ function CutupsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-fg-subtle">Teach</p>
-        <h1 className="font-display text-4xl font-semibold tracking-tight">Cutups</h1>
-        <p className="mt-2 max-w-lg text-sm text-fg-muted">
-          Filtered playlists for install meetings. Share a public link or export CSV/JSON —
-          same workflow coaches expect from Hudl-style film tools.
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-fg-subtle">Teach</p>
+          <h1 className="font-display text-4xl font-semibold tracking-tight">Cutups</h1>
+          <p className="mt-2 max-w-lg text-sm text-fg-muted">
+            Teach reels with auto-advance playback, share links, and export. Open a cutup for
+            the film-room player (Space · J/K · auto-advance · loop).
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="primary"
+          size="sm"
+          disabled={starredCount === 0}
+          onClick={() => {
+            const id = createInstallCutupFromStars();
+            if (!id) {
+              toast.message("No starred plays", {
+                description: "Star plays in film review (S key), then build install.",
+              });
+              return;
+            }
+            toast.success("Install cutup created", {
+              description: `${starredCount} starred play(s) — open teach reel`,
+            });
+            void navigate({ to: "/app/cutups/$cutupId", params: { cutupId: id } });
+          }}
+        >
+          <Star className="h-4 w-4" />
+          Install from stars{starredCount > 0 ? ` (${starredCount})` : ""}
+        </Button>
       </div>
 
       {cutups.length === 0 ? (

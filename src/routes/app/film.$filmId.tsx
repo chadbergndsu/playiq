@@ -109,6 +109,8 @@ function FilmReviewPage() {
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState<PlaybackSpeed>(1);
   const [currentSec, setCurrentSec] = useState(0);
+  /** When on, end of a play jumps to the next filtered play (teach mode). */
+  const [autoAdvance, setAutoAdvance] = useState(false);
 
   const concepts = useMemo(() => listConceptLabels(plays), [plays]);
 
@@ -137,37 +139,53 @@ function FilmReviewPage() {
     if (selected) setCurrentSec(selected.startSec);
   }, [selected]);
 
-  // Demo stage clock (no local media)
-  useEffect(() => {
-    if (media || !playing || !selected) return;
-    const tickMs = Math.max(50, Math.round(250 / speed));
-    const step = 0.25 * speed;
-    const id = window.setInterval(() => {
-      setCurrentSec((t) => {
-        const next = t + step;
-        if (next >= selected.endSec) {
-          setPlaying(false);
-          return selected.endSec;
-        }
-        return next;
-      });
-    }, tickMs);
-    return () => window.clearInterval(id);
-  }, [playing, selected, speed, media]);
-
   const stepPlay = useCallback(
-    (dir: -1 | 1) => {
-      if (!selected) return;
+    (dir: -1 | 1, opts?: { keepPlaying?: boolean }) => {
+      if (!selected) return false;
       const list = visible.length ? visible : plays;
       const idx = list.findIndex((p) => p.id === selected.id);
       const next = list[idx + dir];
       if (next) {
         selectPlay(next.id);
         setCurrentSec(next.startSec);
+        if (opts?.keepPlaying) setPlaying(true);
+        return true;
       }
+      if (opts?.keepPlaying) setPlaying(false);
+      return false;
     },
     [plays, visible, selected, selectPlay],
   );
+
+  const onPlayEnded = useCallback(() => {
+    if (autoAdvance) {
+      stepPlay(1, { keepPlaying: true });
+    } else {
+      setPlaying(false);
+    }
+  }, [autoAdvance, stepPlay]);
+
+  // Demo stage clock (no local media)
+  useEffect(() => {
+    if (media || !playing || !selected) return;
+    const tickMs = Math.max(50, Math.round(250 / speed));
+    const step = 0.25 * speed;
+    let ended = false;
+    const id = window.setInterval(() => {
+      if (ended) return;
+      setCurrentSec((t) => {
+        const next = t + step;
+        if (next >= selected.endSec) {
+          ended = true;
+          window.clearInterval(id);
+          window.setTimeout(() => onPlayEnded(), 0);
+          return selected.endSec;
+        }
+        return next;
+      });
+    }, tickMs);
+    return () => window.clearInterval(id);
+  }, [playing, selected, speed, media, onPlayEnded]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -258,6 +276,16 @@ function FilmReviewPage() {
           </label>
           <Button
             type="button"
+            variant={autoAdvance ? "primary" : "ghost"}
+            size="sm"
+            onClick={() => setAutoAdvance((v) => !v)}
+            aria-pressed={autoAdvance}
+            aria-label="Toggle auto-advance to next play"
+          >
+            Auto-advance {autoAdvance ? "on" : "off"}
+          </Button>
+          <Button
+            type="button"
             variant="ghost"
             size="sm"
             onClick={() => setHelpOpen(true)}
@@ -338,7 +366,7 @@ function FilmReviewPage() {
         onTimeUpdate={(t) => {
           if (media) setCurrentSec(t);
         }}
-        onEndedPlay={() => setPlaying(false)}
+        onEndedPlay={onPlayEnded}
       />
 
       <FilmTimeline
@@ -502,6 +530,9 @@ function FilmReviewPage() {
               <li>
                 <kbd className="rounded border border-border px-1.5 py-0.5 text-fg">S</kbd> Star /
                 unstar play
+              </li>
+              <li>
+                Auto-advance (toolbar) — on play end, jump to next filtered play
               </li>
               <li>
                 <kbd className="rounded border border-border px-1.5 py-0.5 text-fg">1</kbd>–

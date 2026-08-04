@@ -2,9 +2,11 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildCutup,
+  buildCutupFromPlayIds,
   cutupDurationSec,
   filterPlays,
   groupPlaysBySide,
+  starredInstallPlayIds,
   summarizeFilter,
   topConcepts,
 } from "./cutups";
@@ -129,6 +131,21 @@ describe("buildCutup", () => {
     assert.equal(cut.playIds.length, 2);
     assert.equal(cut.filterSummary.includes("offense"), true);
     assert.equal(cut.createdAt, "2026-08-01T00:00:00.000Z");
+  });
+
+  it("builds from explicit play ids and starred install", () => {
+    const cut = buildCutupFromPlayIds({
+      id: "c2",
+      title: "Install",
+      playIds: ["p2", "p1"],
+      filterSummary: "install",
+      now: new Date("2026-08-01T00:00:00.000Z"),
+    });
+    assert.deepEqual(cut.playIds, ["p2", "p1"]);
+    const withStar = plays.map((p) =>
+      p.id === "p1" ? { ...p, starred: true } : p,
+    );
+    assert.deepEqual(starredInstallPlayIds(withStar), ["p1"]);
   });
 });
 

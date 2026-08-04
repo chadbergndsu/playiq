@@ -1,6 +1,10 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { buildCutup } from "@/lib/core/cutups";
+import {
+  buildCutup,
+  buildCutupFromPlayIds,
+  starredInstallPlayIds,
+} from "@/lib/core/cutups";
 import { playToSignal } from "@/lib/core/llm-tagging";
 import { seedFilms, seedPlaysForFilm, withTagCounts } from "@/lib/core/seed";
 import { applyAiToPlay, mergeTags } from "@/lib/core/tagging";
@@ -91,6 +95,14 @@ export type PlayiqState = {
     file?: Blob;
   }) => string;
   createCutupFromFilter: (title: string, filmId: string | "all", filter: PlayFilter) => string;
+  /** Explicit ordered play ids (install reel, multi-select). */
+  createCutupFromPlayIds: (
+    title: string,
+    playIds: string[],
+    description?: string,
+  ) => string;
+  /** Teach reel from all starred plays across the library. */
+  createInstallCutupFromStars: (title?: string) => string | null;
   deleteCutup: (id: string) => void;
   renameCutup: (id: string, title: string) => void;
   removePlayFromCutup: (cutupId: string, playId: string) => void;
@@ -295,6 +307,30 @@ export const usePlayiqStore = create<PlayiqState>()(
         const cut = buildCutup({ id, title, plays, filter });
         set((s) => ({ cutups: [cut, ...s.cutups] }));
         return id;
+      },
+
+      createCutupFromPlayIds: (title, playIds, description) => {
+        const id = `cut_${Date.now()}`;
+        const cut = buildCutupFromPlayIds({
+          id,
+          title: title.trim() || "Untitled cutup",
+          description: description ?? "",
+          playIds,
+          filterSummary: `${playIds.length} plays`,
+        });
+        set((s) => ({ cutups: [cut, ...s.cutups] }));
+        return id;
+      },
+
+      createInstallCutupFromStars: (title) => {
+        const all = Object.values(get().playsByFilm).flat();
+        const playIds = starredInstallPlayIds(all);
+        if (playIds.length === 0) return null;
+        return get().createCutupFromPlayIds(
+          title?.trim() || "Install — starred plays",
+          playIds,
+          "Auto-built from coach star bookmarks.",
+        );
       },
 
       deleteCutup: (id) => set((s) => ({ cutups: s.cutups.filter((c) => c.id !== id) })),

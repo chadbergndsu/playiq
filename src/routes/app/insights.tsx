@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { Download, FileText, Printer } from "lucide-react";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import {
   Bar,
   BarChart,
@@ -9,8 +11,15 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { averageAiConfidence, countAiTags } from "@/lib/core/tagging";
 import { groupPlaysBySide, topConcepts } from "@/lib/core/cutups";
+import {
+  buildScoutReport,
+  scoutReportToHtml,
+  scoutReportToMarkdown,
+} from "@/lib/core/scout-report";
 import {
   countByTagCategory,
   downDistanceMatrix,
@@ -23,9 +32,20 @@ export const Route = createFileRoute("/app/insights")({
   component: InsightsPage,
 });
 
+function downloadText(filename: string, text: string, type: string) {
+  const blob = new Blob([text], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function InsightsPage() {
   const films = usePlayiqStore((s) => s.films);
   const playsByFilm = usePlayiqStore((s) => s.playsByFilm);
+  const [opponentFilter, setOpponentFilter] = useState("");
 
   const data = useMemo(() => {
     const all = Object.values(playsByFilm).flat();
@@ -67,16 +87,96 @@ function InsightsPage() {
     };
   }, [films, playsByFilm]);
 
+  const scout = useMemo(
+    () =>
+      buildScoutReport(films, data.all, {
+        opponent: opponentFilter.trim() || undefined,
+        season: films[0]?.season,
+      }),
+    [films, data.all, opponentFilter],
+  );
+
+  function exportScout(format: "md" | "html") {
+    const base = `playiq_scout_${(opponentFilter.trim() || "self").replace(/\s+/g, "_").slice(0, 24)}`;
+    if (format === "md") {
+      downloadText(`${base}.md`, scoutReportToMarkdown(scout), "text/markdown");
+      toast.message("Scout report downloaded", { description: "Markdown" });
+    } else {
+      const html = scoutReportToHtml(scout);
+      downloadText(`${base}.html`, html, "text/html");
+      toast.message("Scout report downloaded", {
+        description: "Open HTML and print to PDF",
+      });
+    }
+  }
+
+  function printScout() {
+    const html = scoutReportToHtml(scout);
+    const w = window.open("", "_blank", "noopener,noreferrer");
+    if (!w) {
+      toast.message("Pop-up blocked", { description: "Allow pop-ups to print scout report." });
+      return;
+    }
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    window.setTimeout(() => {
+      w.print();
+    }, 250);
+  }
+
   return (
     <div className="space-y-8">
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-fg-subtle">Analytics</p>
-        <h1 className="font-display text-4xl font-semibold tracking-tight">Insights</h1>
-        <p className="mt-2 max-w-lg text-sm text-fg-muted">
-          Tendency reports from tagged film — formations, 3rd-down conversion proxy, and
-          down-distance matrix (Hudl Assist–style snapshot). Updates as you correct AI tags.
-        </p>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-fg-subtle">Analytics</p>
+          <h1 className="font-display text-4xl font-semibold tracking-tight">Insights</h1>
+          <p className="mt-2 max-w-lg text-sm text-fg-muted">
+            Tendency reports from tagged film — formations, 3rd-down conversion, down-distance
+            matrix, and portable scout reports for install meetings.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <label className="block text-xs text-fg-subtle">
+            Opponent filter (optional)
+            <Input
+              value={opponentFilter}
+              onChange={(e) => setOpponentFilter(e.target.value)}
+              placeholder="e.g. Hawks — blank = self-scout"
+              className="mt-1 w-full sm:w-56"
+              aria-label="Opponent filter for scout report"
+            />
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="primary" size="sm" onClick={() => exportScout("md")}>
+              <FileText className="h-4 w-4" />
+              Scout .md
+            </Button>
+            <Button type="button" variant="secondary" size="sm" onClick={() => exportScout("html")}>
+              <Download className="h-4 w-4" />
+              Scout HTML
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={printScout}>
+              <Printer className="h-4 w-4" />
+              Print
+            </Button>
+          </div>
+        </div>
       </div>
+
+      <section className="panel p-4 sm:p-5">
+        <h2 className="text-sm font-semibold">Scout report preview</h2>
+        <p className="mt-1 text-xs text-fg-muted">
+          {scout.title} · {scout.subtitle} · {scout.filmCount} films · {scout.playCount} plays
+        </p>
+        <ul className="mt-3 grid gap-1 text-sm text-fg-muted sm:grid-cols-2">
+          {(scout.sections.find((s) => s.heading === "Snapshot")?.lines ?? []).map((line) => (
+            <li key={line} className="truncate">
+              · {line}
+            </li>
+          ))}
+        </ul>
+      </section>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[

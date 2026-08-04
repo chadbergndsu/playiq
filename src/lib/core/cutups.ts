@@ -67,6 +67,39 @@ export function listConceptLabels(plays: Play[]): string[] {
   return Array.from(set).sort((a, b) => a.localeCompare(b));
 }
 
+/** Build cutup from an explicit ordered play id list (install / multi-select). */
+export function buildCutupFromPlayIds(input: {
+  id: string;
+  title: string;
+  description?: string;
+  playIds: string[];
+  filterSummary?: string;
+  now?: Date;
+}): Cutup {
+  const ts = (input.now ?? new Date()).toISOString();
+  return {
+    id: input.id,
+    title: input.title.trim() || "Untitled cutup",
+    description: input.description?.trim() ?? "",
+    playIds: [...input.playIds],
+    filterSummary: input.filterSummary ?? `${input.playIds.length} plays`,
+    createdAt: ts,
+    updatedAt: ts,
+  };
+}
+
+/** Starred plays as an install teach reel (preserves film order). */
+export function starredInstallPlayIds(plays: Play[]): string[] {
+  return plays
+    .filter((p) => p.starred)
+    .slice()
+    .sort((a, b) => {
+      if (a.filmId !== b.filmId) return a.filmId.localeCompare(b.filmId);
+      return a.index - b.index;
+    })
+    .map((p) => p.id);
+}
+
 export function buildCutup(input: {
   id: string;
   title: string;

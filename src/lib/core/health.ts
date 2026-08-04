@@ -21,7 +21,7 @@ export function buildHealthReport(input: {
   now?: Date;
 }): HealthReport {
   const service = input.service ?? "playiq";
-  const version = input.version ?? "1.0.0";
+  const version = input.version ?? "1.1.0";
   const dbReady = input.dbReady ?? true;
   const timestamp = (input.now ?? new Date()).toISOString();
 
