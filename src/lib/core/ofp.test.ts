@@ -73,4 +73,29 @@ describe("Open Film Package", () => {
     assert.equal(merged.importedPlays, 1);
     assert.equal(merged.playsByFilm.film_x?.length, 1);
   });
+
+  it("merges cutups by id and filters unknown play ids", () => {
+    const pkg = buildOpenFilmPackage({
+      films: [film],
+      plays: [play],
+      cutups: [
+        {
+          id: "cut_import",
+          title: "Install",
+          description: "from OFP",
+          playIds: [play.id, "missing_play"],
+          filterSummary: "imported",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    });
+    const merged = mergeOfpIntoLibrary(
+      { films: [], playsByFilm: {}, cutups: [] },
+      pkg,
+    );
+    assert.equal(merged.importedCutups, 1);
+    assert.equal(merged.cutups.length, 1);
+    assert.deepEqual(merged.cutups[0]!.playIds, [play.id]);
+  });
 });

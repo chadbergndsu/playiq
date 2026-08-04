@@ -8,7 +8,7 @@ import {
   SkipForward,
   Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { PlayList } from "@/components/film/play-list";
 import { VideoStage, type PlaybackSpeed } from "@/components/film/video-stage";
@@ -25,7 +25,10 @@ import {
   exportCutupCsv,
   exportCutupJson,
 } from "@/lib/core/export";
-import { assembleCutupFromSource, isWebCodecsAvailable } from "@/lib/media/cut-assembly";
+import {
+  assembleCutupFromSource,
+  isWebCodecsAvailable,
+} from "@/lib/media/cut-assembly";
 import { getFilmMedia } from "@/lib/media/media-registry";
 import { cutupPlays, usePlayiqStore } from "@/lib/store/playiq-store";
 import { formatClock, formatYards, plural } from "@/lib/utils";
@@ -52,6 +55,7 @@ function CutupDetailPage() {
   const renameCutup = usePlayiqStore((s) => s.renameCutup);
   const removePlayFromCutup = usePlayiqStore((s) => s.removePlayFromCutup);
   const ensureCutupShareToken = usePlayiqStore((s) => s.ensureCutupShareToken);
+  const setCutupShareToken = usePlayiqStore((s) => s.setCutupShareToken);
   const hydrated = usePlayiqStore((s) => s.hydrated);
 
   const cutup = useMemo(() => cutups.find((c) => c.id === cutupId), [cutups, cutupId]);
@@ -80,6 +84,11 @@ function CutupDetailPage() {
   const [autoAdvance, setAutoAdvance] = useState(true);
   const [loop, setLoop] = useState(false);
   const [mediaEpoch, setMediaEpoch] = useState(0);
+  const [playbackEpoch, setPlaybackEpoch] = useState(0);
+  const timeRafRef = useRef<number | null>(null);
+  const clipPlayId = queue[clampQueueIndex(queueIndex, queue.length)]?.play.id ?? null;
+  const clipStartSec =
+    queue[clampQueueIndex(queueIndex, queue.length)]?.play.startSec ?? 0;
 
   const safeIndex = clampQueueIndex(queueIndex, queue.length);
   const clip = queue[safeIndex] ?? null;
@@ -87,12 +96,13 @@ function CutupDetailPage() {
   useEffect(() => {
     setQueueIndex(0);
     setPlaying(false);
+    setPlaybackEpoch(0);
   }, [cutupId]);
 
   useEffect(() => {
-    if (!clip) return;
-    setCurrentSec(clip.play.startSec);
-  }, [clip]);
+    if (!clipPlayId) return;
+    setCurrentSec(clipStartSec);
+  }, [clipPlayId, clipStartSec]);
 
   const media = useMemo(() => {
     void mediaEpoch;
@@ -107,6 +117,7 @@ function CutupDetailPage() {
       setQueueIndex(next);
       const c = queue[next];
       if (c) setCurrentSec(c.play.startSec);
+      setPlaybackEpoch((e) => e + 1);
       if (opts?.play) setPlaying(true);
     },
     [queue],
@@ -185,12 +196,12 @@ function CutupDetailPage() {
   const editingTitle = titleDraft ?? cutup.title;
 
   async function share() {
-    const token = ensureCutupShareToken(cutupId);
-    if (!token) return;
     const latest = usePlayiqStore.getState().cutups.find((c) => c.id === cutupId);
     if (!latest) return;
+    const placeholder =
+      latest.shareToken ?? ensureCutupShareToken(cutupId) ?? "pending";
     const snapshot = buildCutupShareSnapshot({
-      token,
+      token: placeholder,
       cutup: latest,
       plays: allPlays,
       films,
@@ -201,8 +212,14 @@ function CutupDetailPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(snapshot),
       });
-      if (!res.ok) throw new Error("Publish failed");
-      const url = `${window.location.origin}/share/${token}`;
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        token?: string;
+      };
+      if (!res.ok) throw new Error(body.error || "Publish failed");
+      if (!body.token) throw new Error("Server did not return a share token");
+      setCutupShareToken(cutupId, body.token);
+      const url = `${window.location.origin}/share/${body.token}`;
       await navigator.clipboard.writeText(url);
       toast.success("Share link copied", { description: url });
     } catch (err) {
@@ -238,9 +255,16 @@ function CutupDetailPage() {
       toast.message("WebCodecs not available in this browser");
       return;
     }
-    const filmIds = Array.from(new Set(plays.map((p) => p.filmId)));
-    const mediaFilm = filmIds.map((id) => getFilmMedia(id)).find(Boolean);
-    if (!mediaFilm) {
+    const mediaByFilmId = new Map<
+      string,
+      { blob: Blob; fileName: string }
+    >();
+    for (const p of plays) {
+      if (mediaByFilmId.has(p.filmId)) continue;
+      const m = getFilmMedia(p.filmId);
+      if (m) mediaByFilmId.set(p.filmId, { blob: m.blob, fileName: m.fileName });
+    }
+    if (mediaByFilmId.size === 0) {
       toast.message("No local media registered", {
         description: "Upload film with a video file or attach media on the film page.",
       });
@@ -248,28 +272,44 @@ function CutupDetailPage() {
     }
     setAssembling(true);
     try {
-      const result = await assembleCutupFromSource(mediaFilm.blob, plays, {
-        title: current.title,
-        mediaPathHint: mediaFilm.fileName,
-        maxClips: 20,
-      });
+      const { assembleCutupMultiSource } = await import("@/lib/media/cut-assembly");
+      const result =
+        mediaByFilmId.size === 1
+          ? await assembleCutupFromSource(
+              mediaByFilmId.values().next().value!.blob,
+              plays,
+              {
+                title: current.title,
+                mediaPathHint: mediaByFilmId.values().next().value!.fileName,
+                maxClips: 20,
+              },
+            )
+          : await assembleCutupMultiSource(plays, mediaByFilmId, {
+              title: current.title,
+              maxClips: 20,
+            });
       const base = current.title.replace(/\s+/g, "_").slice(0, 40);
+      const revokeLater = (url: string) => {
+        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      };
       if (result.singleMp4) {
         const url = URL.createObjectURL(result.singleMp4);
         const a = document.createElement("a");
         a.href = url;
         a.download = `${base}.mp4`;
         a.click();
-        URL.revokeObjectURL(url);
+        revokeLater(url);
       }
       const zurl = URL.createObjectURL(result.zip);
       const za = document.createElement("a");
       za.href = zurl;
       za.download = `${base}_clips.zip`;
       za.click();
-      URL.revokeObjectURL(zurl);
+      revokeLater(zurl);
       toast.success("Cut assembled", {
-        description: `${result.clipCount} clip(s) — Mediabunny on-device`,
+        description: `${result.clipCount} clip(s)${
+          result.omitted ? ` · ${result.omitted} omitted (cap)` : ""
+        } — Mediabunny on-device`,
       });
     } catch (err) {
       toast.message("Assembly failed", {
@@ -385,13 +425,19 @@ function CutupDetailPage() {
           mediaUrl={media?.objectUrl}
           playStartSec={clip.play.startSec}
           playEndSec={clip.play.endSec}
+          playbackEpoch={playbackEpoch}
           onSpeedChange={setSpeed}
           playLabel={clip.label}
           onToggle={() => setPlaying((p) => !p)}
           onPrev={() => goToClip(safeIndex - 1)}
           onNext={() => goToClip(safeIndex + 1)}
           onTimeUpdate={(t) => {
-            if (media) setCurrentSec(t);
+            if (!media) return;
+            if (timeRafRef.current != null) return;
+            timeRafRef.current = requestAnimationFrame(() => {
+              timeRafRef.current = null;
+              setCurrentSec(t);
+            });
           }}
           onEndedPlay={onClipEnded}
         />
@@ -435,9 +481,10 @@ function CutupDetailPage() {
           />
         </div>
         <div className="panel divide-y divide-border overflow-hidden">
-          {plays.map((p, i) => {
+          {plays.map((p) => {
             const film = films.find((f) => f.id === p.filmId);
             const active = clip?.play.id === p.id;
+            const qIdx = queue.findIndex((c) => c.play.id === p.id);
             return (
               <div
                 key={p.id}
@@ -450,10 +497,13 @@ function CutupDetailPage() {
                 <button
                   type="button"
                   className="min-w-0 flex-1 text-left hover:underline focus-ring rounded-sm"
-                  onClick={() => goToClip(i)}
+                  onClick={() => {
+                    if (qIdx >= 0) goToClip(qIdx);
+                  }}
                 >
                   <p className="font-medium">
-                    {i + 1}. {film?.title ?? p.filmId} · Play {p.index}
+                    {(qIdx >= 0 ? qIdx + 1 : "?")}. {film?.title ?? p.filmId} · Play{" "}
+                    {p.index}
                   </p>
                   <p className="text-xs capitalize text-fg-muted">
                     {p.side}

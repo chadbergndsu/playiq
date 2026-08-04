@@ -95,8 +95,60 @@ describe("export cutup", () => {
     assert.equal(parsed.title, "3rd down");
   });
 
-  it("creates share tokens", () => {
-    const t = newShareToken(1);
+  it("creates CSPRNG share tokens", () => {
+    const t = newShareToken();
     assert.match(t, /^sh_/);
+    assert.ok(t.length >= 20);
+    assert.notEqual(newShareToken(), newShareToken());
+  });
+
+  it("neutralizes CSV formula cells", () => {
+    const snap = buildCutupShareSnapshot({
+      token: "sh_test",
+      cutup: {
+        id: "c1",
+        title: "t",
+        description: "",
+        playIds: ["p1"],
+        filterSummary: "",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+      plays: [
+        {
+          id: "p1",
+          filmId: "f1",
+          index: 1,
+          startSec: 0,
+          endSec: 5,
+          quarter: 1,
+          clock: "12:00",
+          side: "offense",
+          notes: "=HYPERLINK(\"http://evil\")",
+          tags: [],
+        },
+      ],
+      films: [
+        {
+          id: "f1",
+          title: "Film",
+          opponent: "X",
+          week: 1,
+          season: "2025",
+          date: "2025-01-01",
+          venue: "home",
+          level: "varsity",
+          durationSec: 10,
+          status: "ready",
+          aiProgress: 100,
+          playCount: 1,
+          tagCount: 0,
+          thumbnailHue: 1,
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    });
+    const csv = exportCutupCsv(snap);
+    assert.ok(csv.includes("'=HYPERLINK"));
   });
 });

@@ -5,11 +5,16 @@
 
 import type { Cutup, CutupShareSnapshot, Film, Play } from "./types";
 
+/** Neutralize spreadsheet formula injection; then quote if needed. */
 function csvEscape(value: string): string {
-  if (/[",\n\r]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
+  let v = value;
+  if (/^[=+\-@\t\r]/.test(v)) {
+    v = `'${v}`;
   }
-  return value;
+  if (/[",\n\r]/.test(v)) {
+    return `"${v.replace(/"/g, '""')}"`;
+  }
+  return v;
 }
 
 export function buildCutupShareSnapshot(input: {
@@ -120,7 +125,26 @@ export function exportCutupCsv(snapshot: CutupShareSnapshot): string {
   return [headers.join(","), ...rows.map((r) => r.join(","))].join("\n") + "\n";
 }
 
-export function newShareToken(now = Date.now()): string {
-  const rand = Math.random().toString(36).slice(2, 10);
-  return `sh_${now.toString(36)}_${rand}`;
+/**
+ * CSPRNG share token (browser + Node). Prefer server-minted tokens on publish;
+ * client uses this only as a local placeholder before first successful publish.
+ */
+export function newShareToken(): string {
+  const bytes = new Uint8Array(18);
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < bytes.length; i++) {
+      bytes[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]!);
+  }
+  const b64 =
+    typeof btoa === "function"
+      ? btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+      : Buffer.from(bytes).toString("base64url").replace(/=+$/, "");
+  return `sh_${b64}`;
 }

@@ -15,6 +15,8 @@ export type RegisteredMedia = {
 const DB_NAME = "playiq-media-v1";
 const STORE = "films";
 const byFilm = new Map<string, RegisteredMedia>();
+let hydratePromise: Promise<number> | null = null;
+let hydrated = false;
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -59,6 +61,17 @@ async function idbDelete(filmId: string): Promise<void> {
     tx.objectStore(STORE).delete(filmId);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error ?? new Error("IDB delete failed"));
+  });
+  db.close();
+}
+
+async function idbClear(): Promise<void> {
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite");
+    tx.objectStore(STORE).clear();
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error ?? new Error("IDB clear failed"));
   });
   db.close();
 }
@@ -113,28 +126,55 @@ export function unregisterFilmMedia(filmId: string): void {
   void idbDelete(filmId).catch(() => undefined);
 }
 
-/** Load persisted media into memory (call once on app hydrate). */
-export async function hydrateMediaRegistry(): Promise<number> {
-  try {
-    const rows = await idbGetAll();
-    let n = 0;
-    for (const row of rows) {
-      if (!row?.filmId || !row.blob) continue;
-      const prev = byFilm.get(row.filmId);
-      if (prev) URL.revokeObjectURL(prev.objectUrl);
-      byFilm.set(row.filmId, {
-        filmId: row.filmId,
-        fileName: row.fileName || "film.mp4",
-        blob: row.blob,
-        objectUrl: URL.createObjectURL(row.blob),
-        registeredAt: row.registeredAt || Date.now(),
-      });
-      n += 1;
-    }
-    return n;
-  } catch {
-    return 0;
+/** Revoke all object URLs, clear memory + IDB (demo reset). */
+export function clearAllMedia(): void {
+  for (const rec of byFilm.values()) {
+    URL.revokeObjectURL(rec.objectUrl);
   }
+  byFilm.clear();
+  void idbClear().catch(() => undefined);
+}
+
+/**
+ * Load persisted media into memory (call once on app hydrate).
+ * Never overwrites a newer in-memory registration (race-safe with late upload).
+ */
+export async function hydrateMediaRegistry(): Promise<number> {
+  if (hydratePromise) return hydratePromise;
+  hydratePromise = (async () => {
+    try {
+      const rows = await idbGetAll();
+      let n = 0;
+      for (const row of rows) {
+        if (!row?.filmId || !row.blob) continue;
+        const prev = byFilm.get(row.filmId);
+        const rowAt = row.registeredAt || 0;
+        // Keep memory if it is newer or equal (upload won the race).
+        if (prev && prev.registeredAt >= rowAt) {
+          continue;
+        }
+        if (prev) URL.revokeObjectURL(prev.objectUrl);
+        byFilm.set(row.filmId, {
+          filmId: row.filmId,
+          fileName: row.fileName || "film.mp4",
+          blob: row.blob,
+          objectUrl: URL.createObjectURL(row.blob),
+          registeredAt: rowAt || Date.now(),
+        });
+        n += 1;
+      }
+      hydrated = true;
+      return n;
+    } catch {
+      hydrated = true;
+      return 0;
+    }
+  })();
+  return hydratePromise;
+}
+
+export function isMediaRegistryHydrated(): boolean {
+  return hydrated;
 }
 
 export function hasFilmMedia(filmId: string): boolean {

@@ -59,12 +59,16 @@ export async function sampleFrameStats(
   const step = opts.stepSec ?? 0.5;
   const maxFrames = opts.maxFrames ?? 400;
 
+  let input: Input | null = null;
   try {
-    const input = new Input({
+    input = new Input({
       source: new BlobSource(blob),
       formats: ALL_FORMATS,
     });
     const durationSec = await input.computeDuration();
+    if (!Number.isFinite(durationSec) || durationSec <= 0) {
+      throw new Error("Invalid media duration");
+    }
     const video = await input.getPrimaryVideoTrack();
     if (!video) {
       return {
@@ -100,14 +104,52 @@ export async function sampleFrameStats(
       };
     }
     return { frames, durationSec, mode: "sampled" };
-  } catch {
-    const durationSec = 600;
+  } catch (err) {
+    // Prefer probing duration via HTMLVideoElement; never invent a 10-minute game.
+    const durationSec = await probeDurationFallback(blob).catch(() => 0);
+    if (durationSec <= 0) {
+      throw err instanceof Error
+        ? err
+        : new Error("Could not sample or probe media duration");
+    }
     return {
       frames: syntheticFrameStats(durationSec, blob.size % 97),
       durationSec,
       mode: "synthetic",
     };
+  } finally {
+    const anyIn = input as unknown as { dispose?: () => void; destroy?: () => void } | null;
+    anyIn?.dispose?.();
+    anyIn?.destroy?.();
   }
+}
+
+function probeDurationFallback(blob: Blob): Promise<number> {
+  return new Promise((resolve, reject) => {
+    if (typeof document === "undefined") {
+      reject(new Error("No DOM for duration probe"));
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    const cleanup = () => {
+      URL.revokeObjectURL(url);
+      video.removeAttribute("src");
+      video.load();
+    };
+    video.onloadedmetadata = () => {
+      const d = video.duration;
+      cleanup();
+      if (Number.isFinite(d) && d > 0) resolve(d);
+      else reject(new Error("Empty duration"));
+    };
+    video.onerror = () => {
+      cleanup();
+      reject(new Error("Video metadata probe failed"));
+    };
+    video.src = url;
+  });
 }
 
 export async function runLocalVisionToOfp(

@@ -32,6 +32,7 @@ function CutupsPage() {
   const films = usePlayiqStore((s) => s.films);
   const deleteCutup = usePlayiqStore((s) => s.deleteCutup);
   const ensureCutupShareToken = usePlayiqStore((s) => s.ensureCutupShareToken);
+  const setCutupShareToken = usePlayiqStore((s) => s.setCutupShareToken);
   const createInstallCutupFromStars = usePlayiqStore((s) => s.createInstallCutupFromStars);
   const allPlays = Object.values(playsByFilm).flat();
   const starredCount = allPlays.filter((p) => p.starred).length;
@@ -39,15 +40,11 @@ function CutupsPage() {
   async function shareCutup(cutupId: string) {
     const cut = cutups.find((c) => c.id === cutupId);
     if (!cut) return;
-    const token = ensureCutupShareToken(cutupId);
-    if (!token) return;
-    const latest = usePlayiqStore.getState().cutups.find((c) => c.id === cutupId) ?? {
-      ...cut,
-      shareToken: token,
-    };
+    // Placeholder token for snapshot shape; server mints the real capability token.
+    const placeholder = cut.shareToken ?? ensureCutupShareToken(cutupId) ?? "pending";
     const snapshot = buildCutupShareSnapshot({
-      token,
-      cutup: latest,
+      token: placeholder,
+      cutup: cut,
       plays: allPlays,
       films,
     });
@@ -57,11 +54,16 @@ function CutupsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(snapshot),
       });
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        token?: string;
+      };
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(body.error || `Share failed (${res.status})`);
       }
-      const url = `${window.location.origin}/share/${token}`;
+      if (!body.token) throw new Error("Server did not return a share token");
+      setCutupShareToken(cutupId, body.token);
+      const url = `${window.location.origin}/share/${body.token}`;
       await navigator.clipboard.writeText(url);
       toast.success("Share link copied", { description: url });
     } catch (err) {

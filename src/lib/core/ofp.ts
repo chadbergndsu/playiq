@@ -170,16 +170,30 @@ export function parseOfp(raw: string): OpenFilmPackage {
 }
 
 /**
- * Merge imported OFP plays/films into existing state (by id, import wins on collision
- * for film metadata; plays replace per filmId when film is in package).
+ * Merge imported OFP plays/films/cutups into existing state.
+ * - Film metadata: import wins on id collision
+ * - Plays: replace per filmId only when package includes plays for that film
+ * - Cutups: merge by id (import wins); playIds filtered to known plays after merge
  */
 export function mergeOfpIntoLibrary(
-  current: { films: Film[]; playsByFilm: Record<string, Play[]> },
+  current: {
+    films: Film[];
+    playsByFilm: Record<string, Play[]>;
+    cutups?: Cutup[];
+  },
   pkg: OpenFilmPackage,
   now = new Date(),
-): { films: Film[]; playsByFilm: Record<string, Play[]>; importedFilms: number; importedPlays: number } {
+): {
+  films: Film[];
+  playsByFilm: Record<string, Play[]>;
+  cutups: Cutup[];
+  importedFilms: number;
+  importedPlays: number;
+  importedCutups: number;
+} {
   const filmsById = new Map(current.films.map((f) => [f.id, f]));
   const playsByFilm = { ...current.playsByFilm };
+  const cutupsById = new Map((current.cutups ?? []).map((c) => [c.id, c]));
 
   for (const f of pkg.films) {
     const existing = filmsById.get(f.id);
@@ -248,10 +262,35 @@ export function mergeOfpIntoLibrary(
     }
   }
 
+  const knownPlayIds = new Set(
+    Object.values(playsByFilm)
+      .flat()
+      .map((p) => p.id),
+  );
+  let importedCutups = 0;
+  for (const c of pkg.cutups ?? []) {
+    if (!c?.id || typeof c.id !== "string") continue;
+    const playIds = (c.playIds ?? []).filter((id) => knownPlayIds.has(id));
+    cutupsById.set(c.id, {
+      id: c.id,
+      title: (c.title || "Imported cutup").slice(0, 200),
+      description: (c.description ?? "").slice(0, 2000),
+      playIds,
+      filterSummary: (c.filterSummary ?? "imported").slice(0, 400),
+      createdAt: c.createdAt || now.toISOString(),
+      updatedAt: c.updatedAt || now.toISOString(),
+    });
+    importedCutups += 1;
+  }
+
   return {
     films: Array.from(filmsById.values()).sort((a, b) => a.week - b.week),
     playsByFilm,
+    cutups: Array.from(cutupsById.values()).sort(
+      (a, b) => b.updatedAt.localeCompare(a.updatedAt),
+    ),
     importedFilms: pkg.films.length,
     importedPlays: pkg.plays.length,
+    importedCutups,
   };
 }

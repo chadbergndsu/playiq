@@ -73,7 +73,9 @@ export async function xaiChatCompletion(
 
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      throw new Error(`xAI HTTP ${res.status}: ${body.slice(0, 240)}`);
+      // Log upstream detail server-side only — never surface provider body to clients.
+      console.error(`[xai] HTTP ${res.status}: ${body.slice(0, 500)}`);
+      throw new Error(`xAI HTTP ${res.status}`);
     }
 
     const json = (await res.json()) as {

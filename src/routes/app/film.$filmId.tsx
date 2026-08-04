@@ -1,6 +1,6 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { ArrowLeft, Keyboard, Paperclip, Scissors, Sparkles } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { PlayDetail } from "@/components/film/play-detail";
 import { PlayList } from "@/components/film/play-list";
@@ -111,6 +111,8 @@ function FilmReviewPage() {
   const [currentSec, setCurrentSec] = useState(0);
   /** When on, end of a play jumps to the next filtered play (teach mode). */
   const [autoAdvance, setAutoAdvance] = useState(false);
+  const [playbackEpoch, setPlaybackEpoch] = useState(0);
+  const timeRafRef = useRef<number | null>(null);
 
   const concepts = useMemo(() => listConceptLabels(plays), [plays]);
 
@@ -135,9 +137,13 @@ function FilmReviewPage() {
     if (!selectedPlayId && plays[0]) selectPlay(plays[0].id);
   }, [plays, selectedPlayId, selectPlay]);
 
+  const selectedId = selected?.id ?? null;
+  const selectedStart = selected?.startSec ?? 0;
+
   useEffect(() => {
-    if (selected) setCurrentSec(selected.startSec);
-  }, [selected]);
+    if (selectedId == null) return;
+    setCurrentSec(selectedStart);
+  }, [selectedId, selectedStart]);
 
   const stepPlay = useCallback(
     (dir: -1 | 1, opts?: { keepPlaying?: boolean }) => {
@@ -148,6 +154,7 @@ function FilmReviewPage() {
       if (next) {
         selectPlay(next.id);
         setCurrentSec(next.startSec);
+        setPlaybackEpoch((e) => e + 1);
         if (opts?.keepPlaying) setPlaying(true);
         return true;
       }
@@ -363,8 +370,14 @@ function FilmReviewPage() {
         onToggle={() => setPlaying((p) => !p)}
         onPrev={() => stepPlay(-1)}
         onNext={() => stepPlay(1)}
+        playbackEpoch={playbackEpoch}
         onTimeUpdate={(t) => {
-          if (media) setCurrentSec(t);
+          if (!media) return;
+          if (timeRafRef.current != null) return;
+          timeRafRef.current = requestAnimationFrame(() => {
+            timeRafRef.current = null;
+            setCurrentSec(t);
+          });
         }}
         onEndedPlay={onPlayEnded}
       />
@@ -475,6 +488,7 @@ function FilmReviewPage() {
               selectedId={selected?.id ?? null}
               onSelect={(id) => {
                 selectPlay(id);
+                setPlaybackEpoch((e) => e + 1);
                 setPlaying(false);
               }}
             />

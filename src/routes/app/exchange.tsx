@@ -148,7 +148,7 @@ function ExchangePage() {
       const pkg = parseOfp(text);
       const result = importOfp(pkg);
       toast.success("OFP imported", {
-        description: `${result.films} films · ${result.plays} plays merged into library.`,
+        description: `${result.films} films · ${result.plays} plays · ${result.cutups} cutups merged into library.`,
       });
     } catch (err) {
       toast.message("Import failed", {

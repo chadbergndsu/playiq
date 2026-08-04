@@ -21,6 +21,8 @@ export function VideoStage({
   vttUrl,
   playStartSec,
   playEndSec,
+  /** Bump to force reseek + resume (auto-advance / loop). */
+  playbackEpoch = 0,
   onSpeedChange,
   onToggle,
   onPrev,
@@ -36,27 +38,30 @@ export function VideoStage({
   playing: boolean;
   playLabel: string;
   speed: PlaybackSpeed;
-  /** Object URL for local registered media */
   mediaUrl?: string | null;
-  /** Object URL for WebVTT chapters track */
   vttUrl?: string | null;
-  /** Clamp / seek window for current play */
   playStartSec?: number;
   playEndSec?: number;
+  playbackEpoch?: number;
   onSpeedChange: (s: PlaybackSpeed) => void;
   onToggle: () => void;
   onPrev: () => void;
   onNext: () => void;
   onTimeUpdate?: (sec: number) => void;
-  /** Fired when real video hits play end */
   onEndedPlay?: () => void;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const endedLatchRef = useRef(false);
   const hasMedia = Boolean(mediaUrl);
   const start = playStartSec ?? 0;
   const end = playEndSec ?? durationSec;
 
-  // Sync play / pause / rate
+  // Reset end-latch when bounds / media / epoch change
+  useEffect(() => {
+    endedLatchRef.current = false;
+  }, [start, end, mediaUrl, playbackEpoch]);
+
+  // Sync play / pause / rate + resume after clip advance (epoch)
   useEffect(() => {
     const v = videoRef.current;
     if (!v || !hasMedia) return;
@@ -66,23 +71,40 @@ export function VideoStage({
     } else {
       v.pause();
     }
-  }, [playing, speed, hasMedia, mediaUrl]);
+  }, [playing, speed, hasMedia, mediaUrl, playbackEpoch]);
 
-  // Seek when play selection / scrub changes (avoid fighting while playing)
+  // Seek on selection / epoch (not every scrub tick while playing)
   useEffect(() => {
     const v = videoRef.current;
     if (!v || !hasMedia) return;
+    const target = Math.max(0, start);
+    const apply = () => {
+      if (Math.abs(v.currentTime - target) > 0.08) {
+        v.currentTime = target;
+      }
+      if (playing) {
+        void v.play().catch(() => undefined);
+      }
+    };
+    apply();
+  }, [start, end, hasMedia, mediaUrl, playbackEpoch]); // eslint-disable-line react-hooks/exhaustive-deps -- intentional: don't seek on every currentSec
+
+  // Controlled scrub when paused (parent currentSec)
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !hasMedia || playing) return;
     if (Math.abs(v.currentTime - currentSec) > 0.35) {
       v.currentTime = Math.max(0, currentSec);
     }
-  }, [currentSec, hasMedia, start, end]);
+  }, [currentSec, hasMedia, playing]);
 
-  // When play bounds change, jump to start
-  useEffect(() => {
+  function fireEndedOnce() {
+    if (endedLatchRef.current) return;
+    endedLatchRef.current = true;
     const v = videoRef.current;
-    if (!v || !hasMedia) return;
-    v.currentTime = start;
-  }, [start, hasMedia, mediaUrl]);
+    if (v) v.pause();
+    onEndedPlay?.();
+  }
 
   return (
     <div className="panel overflow-hidden">
@@ -105,12 +127,17 @@ export function VideoStage({
             playsInline
             preload="metadata"
             onTimeUpdate={(e) => {
-              const t = e.currentTarget.currentTime;
+              const v = e.currentTarget;
+              const t = v.currentTime;
+              const mediaEnd = Number.isFinite(v.duration) ? v.duration : end;
+              const clipEnd = Math.min(end, mediaEnd);
               onTimeUpdate?.(t);
-              if (t >= end - 0.05) {
-                e.currentTarget.pause();
-                onEndedPlay?.();
+              if (!endedLatchRef.current && t >= clipEnd - 0.05) {
+                fireEndedOnce();
               }
+            }}
+            onEnded={() => {
+              fireEndedOnce();
             }}
             onLoadedMetadata={(e) => {
               e.currentTarget.currentTime = start;
@@ -127,62 +154,39 @@ export function VideoStage({
             ) : null}
           </video>
         ) : (
-          <>
-            <div className="pointer-events-none absolute inset-6 rounded-[var(--radius-md)] border border-fg/10 opacity-50">
-              <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-fg/15" />
-              <div className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border border-fg/15" />
-              {Array.from({ length: 9 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="absolute inset-y-2 w-px bg-fg/8"
-                  style={{ left: `${(i + 1) * 10}%` }}
-                />
-              ))}
-            </div>
-          </>
-        )}
-
-        <div className="pointer-events-none absolute left-4 top-4 flex items-center gap-2 rounded-[var(--radius-sm)] bg-bg/70 px-2.5 py-1 text-xs text-fg-muted backdrop-blur-sm">
-          {hasMedia ? (
-            <>
-              <Video className="h-3.5 w-3.5" />
-              Local film · {title}
-            </>
-          ) : (
-            <>Demo film stage · {title}</>
-          )}
-        </div>
-        <div className="pointer-events-none absolute bottom-4 left-4 right-4 flex items-end justify-between gap-3">
-          <div>
-            <p className="font-display text-3xl font-semibold sm:text-4xl drop-shadow">
-              {opponent}
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-fg-muted">
+            <Video className="h-10 w-10 opacity-40" />
+            <p className="text-sm">
+              {title} · {opponent}
             </p>
-            <p className="text-sm text-fg-muted drop-shadow">{playLabel}</p>
+            <p className="text-xs text-fg-subtle">Demo stage — attach media for real video</p>
           </div>
-          <p className="rounded-[var(--radius-sm)] bg-bg/80 px-2 py-1 font-mono text-sm tabular">
-            {formatClock(currentSec)} / {formatClock(durationSec)}
-          </p>
-        </div>
+        )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 border-t border-border px-3 py-3">
-        <Button type="button" variant="secondary" size="icon" onClick={onPrev} aria-label="Previous play">
+      <div className="flex flex-wrap items-center gap-2 border-t border-border px-3 py-2 sm:px-4">
+        <Button type="button" variant="ghost" size="sm" onClick={onPrev} aria-label="Previous play">
           <SkipBack className="h-4 w-4" />
         </Button>
         <Button
           type="button"
-          variant="primary"
-          size="icon"
+          variant="secondary"
+          size="sm"
           onClick={onToggle}
           aria-label={playing ? "Pause" : "Play"}
         >
           {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
         </Button>
-        <Button type="button" variant="secondary" size="icon" onClick={onNext} aria-label="Next play">
+        <Button type="button" variant="ghost" size="sm" onClick={onNext} aria-label="Next play">
           <SkipForward className="h-4 w-4" />
         </Button>
-
-        <div className="ml-1 flex items-center gap-1" role="group" aria-label="Playback speed">
+        <span className="tabular text-xs text-fg-muted sm:text-sm">
+          {formatClock(currentSec)} / {formatClock(durationSec)}
+        </span>
+        <span className="hidden min-w-0 flex-1 truncate text-xs text-fg-subtle sm:inline">
+          {playLabel}
+        </span>
+        <div className="ml-auto flex items-center gap-1">
           {SPEEDS.map((s) => (
             <button
               key={s}
@@ -190,19 +194,14 @@ export function VideoStage({
               onClick={() => onSpeedChange(s)}
               className={
                 speed === s
-                  ? "h-8 rounded-[var(--radius-sm)] bg-fg px-2 text-xs font-medium tabular text-bg"
-                  : "h-8 rounded-[var(--radius-sm)] border border-border px-2 text-xs font-medium tabular text-fg-muted hover:text-fg"
+                  ? "h-7 rounded-full bg-fg px-2 text-xs font-medium text-bg"
+                  : "h-7 rounded-full px-2 text-xs font-medium text-fg-muted hover:bg-bg-subtle"
               }
             >
-              {s}x
+              {s}×
             </button>
           ))}
         </div>
-
-        <p className="ml-auto text-xs text-fg-subtle">
-          {hasMedia ? "Live local media · " : ""}
-          J/K · Space · S star · ? help
-        </p>
       </div>
     </div>
   );

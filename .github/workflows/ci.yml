@@ -40,3 +40,9 @@ jobs:
 
       - name: Unit tests
         run: npm test
+
+      - name: Production build
+        run: npm run build
+        env:
+          # Build without real secrets; migrate no-ops without DATABASE_URL.
+          NODE_ENV: production

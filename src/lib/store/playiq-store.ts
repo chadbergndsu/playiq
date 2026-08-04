@@ -12,7 +12,10 @@ import { createUploadedFilm, finalizeUploadedFilm } from "@/lib/core/upload";
 import { newShareToken } from "@/lib/core/export";
 import { mergeOfpIntoLibrary, type OpenFilmPackage } from "@/lib/core/ofp";
 import { importWebVttToPlays } from "@/lib/core/webvtt";
-import { registerFilmMedia } from "@/lib/media/media-registry";
+import { clearAllMedia, registerFilmMedia } from "@/lib/media/media-registry";
+
+/** Per-film upload finalize generation — ignore stale timers. */
+const uploadFinalizeGen = new Map<string, number>();
 import type {
   Cutup,
   Film,
@@ -107,8 +110,14 @@ export type PlayiqState = {
   renameCutup: (id: string, title: string) => void;
   removePlayFromCutup: (cutupId: string, playId: string) => void;
   ensureCutupShareToken: (cutupId: string) => string | null;
+  /** Persist server-minted share token after successful publish. */
+  setCutupShareToken: (cutupId: string, token: string) => void;
   /** Import Open Film Package (portable coach exchange). */
-  importOfp: (pkg: OpenFilmPackage) => { films: number; plays: number };
+  importOfp: (pkg: OpenFilmPackage) => {
+    films: number;
+    plays: number;
+    cutups: number;
+  };
   /** Replace or set plays for a film (WebVTT / vision import). */
   setFilmPlays: (filmId: string, plays: Play[], status?: FilmStatus) => void;
   importWebVtt: (
@@ -145,6 +154,8 @@ export const usePlayiqStore = create<PlayiqState>()(
       setHydrated: (v) => set({ hydrated: v }),
 
       resetDemo: () => {
+        uploadFinalizeGen.clear();
+        clearAllMedia();
         const next = initialState();
         set({
           films: next.films,
@@ -287,8 +298,14 @@ export const usePlayiqStore = create<PlayiqState>()(
           return { films, playsByFilm };
         });
         const id = film.id;
+        const gen = (uploadFinalizeGen.get(id) ?? 0) + 1;
+        uploadFinalizeGen.set(id, gen);
         setTimeout(() => {
+          if (uploadFinalizeGen.get(id) !== gen) return;
           set((state) => {
+            const current = state.films.find((f) => f.id === id);
+            // Only finalize if still processing — never stomp ready / imported state.
+            if (!current || current.status !== "processing") return state;
             const films = state.films.map((f) =>
               f.id === id ? finalizeUploadedFilm(f) : f,
             );
@@ -365,6 +382,7 @@ export const usePlayiqStore = create<PlayiqState>()(
         const cut = get().cutups.find((c) => c.id === cutupId);
         if (!cut) return null;
         if (cut.shareToken) return cut.shareToken;
+        // Local placeholder only — server mints the real capability token on publish.
         const token = newShareToken();
         set((s) => ({
           cutups: s.cutups.map((c) =>
@@ -376,15 +394,39 @@ export const usePlayiqStore = create<PlayiqState>()(
         return token;
       },
 
+      setCutupShareToken: (cutupId, token) => {
+        const trimmed = token.trim();
+        if (!trimmed) return;
+        set((s) => ({
+          cutups: s.cutups.map((c) =>
+            c.id === cutupId
+              ? { ...c, shareToken: trimmed, updatedAt: new Date().toISOString() }
+              : c,
+          ),
+        }));
+      },
+
       importOfp: (pkg) => {
         const state = get();
         const merged = mergeOfpIntoLibrary(
-          { films: state.films, playsByFilm: state.playsByFilm },
+          {
+            films: state.films,
+            playsByFilm: state.playsByFilm,
+            cutups: state.cutups,
+          },
           pkg,
         );
         const films = withTagCounts(merged.films, merged.playsByFilm);
-        set({ films, playsByFilm: merged.playsByFilm });
-        return { films: merged.importedFilms, plays: merged.importedPlays };
+        set({
+          films,
+          playsByFilm: merged.playsByFilm,
+          cutups: merged.cutups,
+        });
+        return {
+          films: merged.importedFilms,
+          plays: merged.importedPlays,
+          cutups: merged.importedCutups,
+        };
       },
 
       setFilmPlays: (filmId, plays, status) => {

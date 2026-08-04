@@ -2,7 +2,7 @@
 
 AI-first football film analysis for coaches and programs.
 
-**Status: LIVE v1.1.0** — production on Vercel + Neon.
+**Status: LIVE v1.1.1** — production on Vercel + Neon.
 
 | | |
 |--|--|
@@ -129,10 +129,11 @@ docs/adr/           # Architecture decisions
 - [x] Basic health check (`GET /api/health`)
 - [x] Postgres (Neon) provisioned via Vercel Marketplace (`playiq-db`); migrations apply on build
 - [x] Dependabot enabled (`.github/dependabot.yml`)
-- [x] ADRs (`docs/adr/0001`–`0008`)
+- [x] ADRs (`docs/adr/0001`–`0009`)
 - [x] Auth via proven library (Better Auth)
 - [x] **v1.0.0 production go-live** (2026-08-04)
 - [x] **v1.1.0 teach reel + scout report** (2026-08-04)
+- [x] **v1.1.1 security + playback hardening** (2026-08-04)
 
 ### Production (live)
 
@@ -143,7 +144,7 @@ docs/adr/           # Architecture decisions
 | Vercel project | `chadbergndsus-projects/playiq` (GitHub-connected) |
 | Database | Neon Free (`playiq-db`) → `DATABASE_URL` |
 | Share links | Durable via `cutup_shares` on Neon |
-| Health | `GET /api/health` → `status: ok`, version `1.1.0` |
+| Health | `GET /api/health` → `status: ok`, version `1.1.1` (DB ping) |
 | HTTPS | Enforced by Vercel |
 
 ### Optional next (not blocking go-live)
