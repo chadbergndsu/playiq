@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { ArrowLeft, Download, Link2, Trash2 } from "lucide-react";
+import { ArrowLeft, Clapperboard, Download, Link2, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { PlayList } from "@/components/film/play-list";
@@ -11,6 +11,8 @@ import {
   exportCutupCsv,
   exportCutupJson,
 } from "@/lib/core/export";
+import { assembleCutupFromSource, isWebCodecsAvailable } from "@/lib/media/cut-assembly";
+import { getFilmMedia } from "@/lib/media/media-registry";
 import { cutupPlays, usePlayiqStore } from "@/lib/store/playiq-store";
 import { formatClock, formatYards, plural } from "@/lib/utils";
 
@@ -45,6 +47,7 @@ function CutupDetailPage() {
   );
   const allPlays = useMemo(() => Object.values(playsByFilm).flat(), [playsByFilm]);
   const [titleDraft, setTitleDraft] = useState<string | null>(null);
+  const [assembling, setAssembling] = useState(false);
 
   if (!cutup) {
     return (
@@ -107,6 +110,56 @@ function CutupDetailPage() {
     toast.message(`Exported ${format.toUpperCase()}`);
   }
 
+  async function assembleMedia() {
+    const current = usePlayiqStore.getState().cutups.find((c) => c.id === cutupId);
+    if (!current) return;
+    if (!isWebCodecsAvailable()) {
+      toast.message("WebCodecs not available in this browser");
+      return;
+    }
+    // Prefer media from first play's film
+    const filmIds = Array.from(new Set(plays.map((p) => p.filmId)));
+    const mediaFilm = filmIds.map((id) => getFilmMedia(id)).find(Boolean);
+    if (!mediaFilm) {
+      toast.message("No local media registered", {
+        description: "Upload film with a video file or attach media on Exchange.",
+      });
+      return;
+    }
+    setAssembling(true);
+    try {
+      const result = await assembleCutupFromSource(mediaFilm.blob, plays, {
+        title: current.title,
+        mediaPathHint: mediaFilm.fileName,
+        maxClips: 20,
+      });
+      const base = current.title.replace(/\s+/g, "_").slice(0, 40);
+      if (result.singleMp4) {
+        const url = URL.createObjectURL(result.singleMp4);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${base}.mp4`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+      const zurl = URL.createObjectURL(result.zip);
+      const za = document.createElement("a");
+      za.href = zurl;
+      za.download = `${base}_clips.zip`;
+      za.click();
+      URL.revokeObjectURL(zurl);
+      toast.success("Cut assembled", {
+        description: `${result.clipCount} clip(s) — Mediabunny on-device`,
+      });
+    } catch (err) {
+      toast.message("Assembly failed", {
+        description: err instanceof Error ? err.message : "Unknown error",
+      });
+    } finally {
+      setAssembling(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -146,6 +199,16 @@ function CutupDetailPage() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            disabled={assembling}
+            onClick={() => void assembleMedia()}
+          >
+            <Clapperboard className="h-4 w-4" />
+            {assembling ? "Assembling…" : "Assemble MP4/ZIP"}
+          </Button>
           <Button type="button" variant="secondary" size="sm" onClick={() => void share()}>
             <Link2 className="h-4 w-4" />
             Share link

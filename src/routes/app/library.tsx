@@ -37,6 +37,7 @@ function LibraryPage() {
   const [week, setWeek] = useState("1");
   const [venue, setVenue] = useState<Venue>("home");
   const [fileName, setFileName] = useState<string | undefined>();
+  const [fileBlob, setFileBlob] = useState<Blob | undefined>();
 
   function submitUpload() {
     const w = Number(week);
@@ -49,12 +50,16 @@ function LibraryPage() {
       week: Number.isFinite(w) ? w : 1,
       venue,
       fileName,
+      file: fileBlob,
     });
     setUploadOpen(false);
     setOpponent("");
     setFileName(undefined);
+    setFileBlob(undefined);
     toast.success("Film queued", {
-      description: "Encode + AI first-pass running. Opens when ready for review.",
+      description: fileBlob
+        ? "Local file kept for cut assembly + vision. AI first-pass running."
+        : "Encode + AI first-pass running. Opens when ready for review.",
     });
     void navigate({ to: "/app/film/$filmId", params: { filmId: id } });
   }
@@ -135,8 +140,8 @@ function LibraryPage() {
                   Upload film
                 </h2>
                 <p className="mt-1 text-sm text-fg-muted">
-                  Creates a film record and runs a local AI first-pass. Object storage
-                  encode pipeline is next for production files.
+                  Creates a film record and AI first-pass. Attach a video to enable
+                  browser cut assembly (Mediabunny/WebCodecs) and local vision.
                 </p>
               </div>
               <button
@@ -194,6 +199,7 @@ function LibraryPage() {
                   onChange={(e) => {
                     const f = e.target.files?.[0];
                     setFileName(f?.name);
+                    setFileBlob(f ?? undefined);
                     if (f && !opponent.trim()) {
                       setOpponent(f.name.replace(/\.[^.]+$/, "").slice(0, 40));
                     }

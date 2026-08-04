@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import {
   BookOpen,
+  Clapperboard,
   Download,
+  Eye,
   FileJson,
   Film,
   Package,
@@ -30,6 +32,12 @@ import {
   ontologyByFamily,
 } from "@/lib/core/ontology";
 import { playsToWebVttChapters, playsToWebVttMetadata } from "@/lib/core/webvtt";
+import {
+  assembleCutupFromSource,
+  isWebCodecsAvailable,
+} from "@/lib/media/cut-assembly";
+import { getFilmMedia, registerFilmMedia } from "@/lib/media/media-registry";
+import { runLocalVisionToOfp } from "@/lib/media/vision-client";
 import { usePlayiqStore } from "@/lib/store/playiq-store";
 
 export const Route = createFileRoute("/app/exchange")({
@@ -46,16 +54,29 @@ function downloadText(filename: string, text: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
+function downloadBlob(filename: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function ExchangePage() {
   const films = usePlayiqStore((s) => s.films);
   const playsByFilm = usePlayiqStore((s) => s.playsByFilm);
   const cutups = usePlayiqStore((s) => s.cutups);
   const importOfp = usePlayiqStore((s) => s.importOfp);
+  const importWebVtt = usePlayiqStore((s) => s.importWebVtt);
   const allPlays = useMemo(() => Object.values(playsByFilm).flat(), [playsByFilm]);
   const ontologyHits = useMemo(() => countOntologyHits(allPlays).slice(0, 12), [allPlays]);
   const families = listOntologyFamilies();
   const [diagramLabel, setDiagramLabel] = useState("Shotgun");
   const [filmId, setFilmId] = useState(films[0]?.id ?? "");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [progress, setProgress] = useState<string>("");
+  const webCodecs = typeof window !== "undefined" && isWebCodecsAvailable();
 
   const selectedPlays = playsByFilm[filmId] ?? allPlays.slice(0, 40);
   const mediaPlaceholder = films.find((f) => f.id === filmId)?.sourceFileName
@@ -136,6 +157,95 @@ function ExchangePage() {
     }
   }
 
+  async function onImportVtt(file: File) {
+    if (!filmId) {
+      toast.message("Select a film first");
+      return;
+    }
+    try {
+      const text = await file.text();
+      const result = importWebVtt(filmId, text, file.name);
+      toast.success("WebVTT imported", {
+        description: `${result.plays} plays written to selected film.`,
+      });
+    } catch (err) {
+      toast.message("WebVTT import failed", {
+        description: err instanceof Error ? err.message : "Invalid VTT",
+      });
+    }
+  }
+
+  async function onLocalVision(file: File) {
+    setBusy("vision");
+    setProgress("Starting…");
+    try {
+      const result = await runLocalVisionToOfp(
+        file,
+        {
+          opponent: file.name.replace(/\.[^.]+$/, "").slice(0, 40) || "Vision",
+          week: films.length + 1,
+          fileName: file.name,
+        },
+        (msg, r) => setProgress(r != null ? `${msg} ${Math.round(r * 100)}%` : msg),
+      );
+      const imported = importOfp(result.package);
+      const newFilmId = result.package.films[0]?.id;
+      if (newFilmId) registerFilmMedia(newFilmId, file, file.name);
+      toast.success("Local vision complete", {
+        description: `${result.mode} frames · ${result.playCount} plays · ${imported.films} film(s). OFP contract ready.`,
+      });
+      if (newFilmId) setFilmId(newFilmId);
+    } catch (err) {
+      toast.message("Vision failed", {
+        description: err instanceof Error ? err.message : "Unknown error",
+      });
+    } finally {
+      setBusy(null);
+      setProgress("");
+    }
+  }
+
+  async function onAssembleCutup() {
+    const media = getFilmMedia(filmId);
+    if (!media) {
+      toast.message("No local media for this film", {
+        description: "Upload a video on Library or attach media below first.",
+      });
+      return;
+    }
+    if (selectedPlays.length === 0) {
+      toast.message("No plays on this film");
+      return;
+    }
+    setBusy("cut");
+    setProgress("Assembling…");
+    try {
+      const film = films.find((f) => f.id === filmId);
+      const result = await assembleCutupFromSource(media.blob, selectedPlays, {
+        title: film?.title,
+        mediaPathHint: media.fileName,
+        maxClips: 16,
+        onProgress: (done, total) =>
+          setProgress(`Clip ${Math.min(total, Math.ceil(done))}/${total}`),
+      });
+      const base = (film?.opponent ?? "cutup").replace(/\s+/g, "_");
+      if (result.singleMp4) {
+        downloadBlob(`${base}_play.mp4`, result.singleMp4);
+      }
+      downloadBlob(`${base}_cutup.zip`, result.zip);
+      toast.success("Cut assembly ready", {
+        description: `${result.clipCount} clip(s) via Mediabunny/WebCodecs — private, on-device.`,
+      });
+    } catch (err) {
+      toast.message("Assembly failed", {
+        description: err instanceof Error ? err.message : "WebCodecs error",
+      });
+    } finally {
+      setBusy(null);
+      setProgress("");
+    }
+  }
+
   return (
     <div className="space-y-10">
       <div>
@@ -144,13 +254,16 @@ function ExchangePage() {
         </p>
         <h1 className="font-display text-4xl font-semibold tracking-tight">Exchange</h1>
         <p className="mt-2 max-w-2xl text-sm text-fg-muted">
-          Open-source-friendly film exchange that commercial film rooms rarely ship: a
-          versioned <strong className="text-fg">play ontology</strong>, portable{" "}
-          <strong className="text-fg">Open Film Package</strong> JSON,{" "}
-          <strong className="text-fg">WebVTT</strong> chapter tracks (W3C), and{" "}
-          <strong className="text-fg">FFmpeg / EDL</strong> editorial lists. Own your
-          data — leave anytime.
+          Full open pipeline: ontology · OFP · WebVTT round-trip · FFmpeg/EDL ·{" "}
+          <strong className="text-fg">Mediabunny cut assembly</strong> ·{" "}
+          <strong className="text-fg">local vision → OFP</strong>
+          {webCodecs ? " · WebCodecs ready" : " · WebCodecs unavailable in this browser"}.
         </p>
+        {busy && (
+          <p className="mt-2 text-xs text-fg-subtle">
+            Working: {busy} — {progress}
+          </p>
+        )}
       </div>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -196,9 +309,9 @@ function ExchangePage() {
         ))}
       </section>
 
-      <section className="panel grid gap-6 p-5 lg:grid-cols-[1fr_1fr]">
+      <section className="panel grid gap-6 p-5 lg:grid-cols-2">
         <div>
-          <h2 className="text-sm font-semibold">Source film for track / EDL export</h2>
+          <h2 className="text-sm font-semibold">Source film</h2>
           <select
             value={filmId}
             onChange={(e) => setFilmId(e.target.value)}
@@ -207,6 +320,7 @@ function ExchangePage() {
             {films.map((f) => (
               <option key={f.id} value={f.id}>
                 W{f.week} · {f.title}
+                {getFilmMedia(f.id) ? " · media" : ""}
               </option>
             ))}
           </select>
@@ -222,31 +336,110 @@ function ExchangePage() {
             >
               FFmpeg filter script
             </Button>
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              disabled={Boolean(busy) || !webCodecs}
+              onClick={() => void onAssembleCutup()}
+            >
+              <Clapperboard className="h-3.5 w-3.5" />
+              Assemble cut (WebCodecs)
+            </Button>
           </div>
           <p className="mt-3 text-xs text-fg-subtle">
-            Media path placeholder: <code className="text-fg-muted">{mediaPlaceholder}</code> —
-            edit after export to match your local files.
+            Media path: <code className="text-fg-muted">{mediaPlaceholder}</code>
+            {getFilmMedia(filmId)
+              ? " · local blob registered"
+              : " · attach media to assemble"}
           </p>
-        </div>
-        <div>
-          <h2 className="text-sm font-semibold">Import OFP</h2>
-          <p className="mt-1 text-xs text-fg-muted">
-            Merge a coach&apos;s Open Film Package into this library (ids collide → import wins).
-          </p>
-          <label className="mt-4 flex cursor-pointer flex-col items-start gap-2 rounded-[var(--radius-md)] border border-dashed border-border bg-bg-subtle/40 px-4 py-6 hover:border-border-strong">
-            <Upload className="h-5 w-5 text-fg-subtle" />
-            <span className="text-sm font-medium">Choose .ofp.json / .json</span>
+          <label className="mt-3 block text-xs text-fg-subtle">
+            Attach / replace local media for selected film
             <input
               type="file"
-              accept=".json,application/json"
-              className="sr-only"
+              accept="video/*"
+              className="mt-1 block w-full text-sm text-fg-muted file:mr-3 file:rounded-[var(--radius-sm)] file:border-0 file:bg-bg-subtle file:px-3 file:py-2 file:text-sm file:text-fg"
               onChange={(e) => {
                 const f = e.target.files?.[0];
-                if (f) void onImportFile(f);
+                if (f && filmId) {
+                  registerFilmMedia(filmId, f, f.name);
+                  toast.message("Media registered for session", {
+                    description: f.name,
+                  });
+                }
                 e.target.value = "";
               }}
             />
           </label>
+        </div>
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-sm font-semibold">Import OFP</h2>
+            <p className="mt-1 text-xs text-fg-muted">
+              Merge Open Film Package (ids collide → import wins).
+            </p>
+            <label className="mt-3 flex cursor-pointer flex-col items-start gap-2 rounded-[var(--radius-md)] border border-dashed border-border bg-bg-subtle/40 px-4 py-4 hover:border-border-strong">
+              <Upload className="h-5 w-5 text-fg-subtle" />
+              <span className="text-sm font-medium">.ofp.json / .json</span>
+              <input
+                type="file"
+                accept=".json,application/json"
+                className="sr-only"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void onImportFile(f);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold">Import WebVTT → plays</h2>
+            <p className="mt-1 text-xs text-fg-muted">
+              Round-trip chapters or PlayIQ metadata tracks onto the selected film.
+            </p>
+            <label className="mt-3 flex cursor-pointer flex-col items-start gap-2 rounded-[var(--radius-md)] border border-dashed border-border bg-bg-subtle/40 px-4 py-4 hover:border-border-strong">
+              <ScrollText className="h-5 w-5 text-fg-subtle" />
+              <span className="text-sm font-medium">.vtt file</span>
+              <input
+                type="file"
+                accept=".vtt,text/vtt,text/plain"
+                className="sr-only"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void onImportVtt(f);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          </div>
+          <div>
+            <h2 className="flex items-center gap-2 text-sm font-semibold">
+              <Eye className="h-4 w-4 text-fg-subtle" />
+              Local vision → OFP
+            </h2>
+            <p className="mt-1 text-xs text-fg-muted">
+              Sample frames (Mediabunny), scene-cut segments, heuristic tags, import as OFP.
+              Same contract as <code className="text-fg-muted">npx tsx scripts/vision-sidecar.ts</code>.
+            </p>
+            <label className="mt-3 flex cursor-pointer flex-col items-start gap-2 rounded-[var(--radius-md)] border border-dashed border-border bg-bg-subtle/40 px-4 py-4 hover:border-border-strong">
+              <Eye className="h-5 w-5 text-fg-subtle" />
+              <span className="text-sm font-medium">
+                {busy === "vision" ? progress || "Running…" : "Pick game video"}
+              </span>
+              <input
+                type="file"
+                accept="video/*"
+                disabled={Boolean(busy)}
+                className="sr-only"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void onLocalVision(f);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          </div>
         </div>
       </section>
 
@@ -361,6 +554,14 @@ function ExchangePage() {
           <li>
             <strong className="text-fg">SVG diagrams</strong> — open graphics you can fork,
             print, or version in git.
+          </li>
+          <li>
+            <strong className="text-fg">Mediabunny / WebCodecs</strong> — on-device cut
+            assembly; film never leaves the laptop.
+          </li>
+          <li>
+            <strong className="text-fg">Local vision sidecar</strong> — open scene-cut → OFP
+            (YOLO can plug in later without changing the exchange format).
           </li>
         </ul>
       </section>

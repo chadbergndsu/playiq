@@ -7,6 +7,8 @@ import { applyAiToPlay, mergeTags } from "@/lib/core/tagging";
 import { createUploadedFilm, finalizeUploadedFilm } from "@/lib/core/upload";
 import { newShareToken } from "@/lib/core/export";
 import { mergeOfpIntoLibrary, type OpenFilmPackage } from "@/lib/core/ofp";
+import { importWebVttToPlays } from "@/lib/core/webvtt";
+import { registerFilmMedia } from "@/lib/media/media-registry";
 import type {
   Cutup,
   Film,
@@ -85,6 +87,8 @@ export type PlayiqState = {
     venue?: Venue;
     fileName?: string;
     durationSec?: number;
+    /** Optional browser File for local cut assembly / vision */
+    file?: Blob;
   }) => string;
   createCutupFromFilter: (title: string, filmId: string | "all", filter: PlayFilter) => string;
   deleteCutup: (id: string) => void;
@@ -93,6 +97,13 @@ export type PlayiqState = {
   ensureCutupShareToken: (cutupId: string) => string | null;
   /** Import Open Film Package (portable coach exchange). */
   importOfp: (pkg: OpenFilmPackage) => { films: number; plays: number };
+  /** Replace or set plays for a film (WebVTT / vision import). */
+  setFilmPlays: (filmId: string, plays: Play[], status?: FilmStatus) => void;
+  importWebVtt: (
+    filmId: string,
+    raw: string,
+    sourceLabel?: string,
+  ) => { plays: number };
 };
 
 function findPlayLocation(
@@ -255,12 +266,14 @@ export const usePlayiqStore = create<PlayiqState>()(
 
       uploadFilm: (input) => {
         const { film, plays } = createUploadedFilm(input);
+        if (input.file) {
+          registerFilmMedia(film.id, input.file, input.fileName ?? "upload.mp4");
+        }
         set((state) => {
           const playsByFilm = { ...state.playsByFilm, [film.id]: plays };
           const films = withTagCounts([film, ...state.films], playsByFilm);
           return { films, playsByFilm };
         });
-        // Simulate encode + AI pipeline finishing shortly after upload
         const id = film.id;
         setTimeout(() => {
           set((state) => {
@@ -336,6 +349,29 @@ export const usePlayiqStore = create<PlayiqState>()(
         const films = withTagCounts(merged.films, merged.playsByFilm);
         set({ films, playsByFilm: merged.playsByFilm });
         return { films: merged.importedFilms, plays: merged.importedPlays };
+      },
+
+      setFilmPlays: (filmId, plays, status) => {
+        set((state) => {
+          const playsByFilm = { ...state.playsByFilm, [filmId]: plays };
+          const films = state.films.map((f) => {
+            if (f.id !== filmId) return f;
+            return {
+              ...f,
+              status: status ?? f.status,
+              playCount: plays.length,
+              tagCount: plays.reduce((n, p) => n + p.tags.length, 0),
+              aiProgress: status === "ready" || status === "needs_review" ? 100 : f.aiProgress,
+            };
+          });
+          return { playsByFilm, films: withTagCounts(films, playsByFilm) };
+        });
+      },
+
+      importWebVtt: (filmId, raw, sourceLabel) => {
+        const plays = importWebVttToPlays(filmId, raw, { sourceLabel });
+        get().setFilmPlays(filmId, plays, "needs_review");
+        return { plays: plays.length };
       },
     }),
     {

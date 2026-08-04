@@ -20,7 +20,7 @@ PlayIQ is a Hudl-style film workflow wedge: upload/review season film, get an AI
 | **Cutups** | Teach reels: rename, remove plays, **share link**, CSV/JSON export |
 | **Public share** | `/share/$token` — no login required to view/export a published cutup |
 | **Insights** | Weekly charts, concepts, **formation tendencies**, 3rd-down conversion, down×distance matrix |
-| **Exchange (open)** | **Open Film Package** import/export, **WebVTT** chapters, **FFmpeg/EDL** lists, **Open Play Ontology**, SVG formation diagrams — portable stack competitors skip |
+| **Exchange (open)** | OFP import/export, WebVTT round-trip, FFmpeg/EDL, ontology, SVG, **Mediabunny cut assembly**, **local vision → OFP** |
 | **Auth** | Better Auth (Google / X) — film room works without sign-in |
 
 Demo data is seeded client-side (persisted in the browser). **Reset demo data** on Overview restores the stock season.
@@ -71,6 +71,7 @@ npm run dev            # http://0.0.0.0:8080
 | `npm test` | Unit tests (`src/**/*.test.ts`) |
 | `npm run ci` | lint + typecheck + test |
 | `npm run build` | Production build + DB migrations |
+| `npm run vision-sidecar` | CLI local vision → `.ofp.json` (no GPU required) |
 | `npm run format` | Prettier write |
 
 ## Architecture
