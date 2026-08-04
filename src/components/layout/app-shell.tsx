@@ -4,6 +4,7 @@ import {
   Film,
   LayoutDashboard,
   Library,
+  Package,
   Scissors,
   Sparkles,
 } from "lucide-react";
@@ -13,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 type NavItem = {
-  to: "/app" | "/app/library" | "/app/cutups" | "/app/insights";
+  to: "/app" | "/app/library" | "/app/cutups" | "/app/insights" | "/app/exchange";
   label: string;
   icon: typeof LayoutDashboard;
   exact?: boolean;
@@ -24,6 +25,7 @@ const nav: NavItem[] = [
   { to: "/app/library", label: "Film library", icon: Library },
   { to: "/app/cutups", label: "Cutups", icon: Scissors },
   { to: "/app/insights", label: "Insights", icon: Sparkles },
+  { to: "/app/exchange", label: "Exchange", icon: Package },
 ];
 
 function isActive(pathname: string, item: NavItem): boolean {

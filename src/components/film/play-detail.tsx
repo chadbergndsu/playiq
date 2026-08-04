@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Plus, Star, X } from "lucide-react";
 import type { Play } from "@/lib/core/types";
+import { mapPlayTagsToOntology } from "@/lib/core/ontology";
 import { confidenceBand } from "@/lib/core/tagging";
 import { formatYards } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { FormationDiagram } from "./formation-diagram";
 import { TagSourceBadge } from "./status-badge";
 
 export function PlayDetail({
@@ -22,6 +24,11 @@ export function PlayDetail({
   onToggleStar?: () => void;
 }) {
   const [draft, setDraft] = useState("");
+  const ontology = useMemo(() => mapPlayTagsToOntology(play.tags), [play.tags]);
+  const diagramLabel =
+    play.tags.find((t) => t.category === "formation")?.label ??
+    play.tags.find((t) => t.category === "concept")?.label ??
+    play.side;
 
   return (
     <div className="panel flex flex-col gap-4 p-4 sm:p-5">
@@ -150,6 +157,27 @@ export function PlayDetail({
               {t.label}
             </Badge>
           ))}
+      </div>
+
+      {ontology.length > 0 && (
+        <div className="border-t border-border pt-3">
+          <h3 className="text-sm font-medium">Open Play Ontology</h3>
+          <ul className="mt-2 flex flex-wrap gap-1.5">
+            {ontology.map(({ entry }) => (
+              <li
+                key={entry.id}
+                className="rounded-full border border-border bg-bg-subtle/50 px-2.5 py-1 font-mono text-[11px] text-fg-muted"
+                title={entry.blurb}
+              >
+                {entry.id}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="overflow-hidden rounded-[var(--radius-md)] border border-border">
+        <FormationDiagram label={diagramLabel} />
       </div>
     </div>
   );

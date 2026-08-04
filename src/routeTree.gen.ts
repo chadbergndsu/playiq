@@ -15,6 +15,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as AppIndexRouteImport } from './routes/app/index'
 import { Route as AppCutupsRouteImport } from './routes/app/cutups'
+import { Route as AppExchangeRouteImport } from './routes/app/exchange'
 import { Route as AppInsightsRouteImport } from './routes/app/insights'
 import { Route as AppLibraryRouteImport } from './routes/app/library'
 import { Route as ShareTokenRouteImport } from './routes/share.$token'
@@ -52,6 +53,11 @@ const AppIndexRoute = AppIndexRouteImport.update({
 const AppCutupsRoute = AppCutupsRouteImport.update({
   id: '/cutups',
   path: '/cutups',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppExchangeRoute = AppExchangeRouteImport.update({
+  id: '/exchange',
+  path: '/exchange',
   getParentRoute: () => AppRoute,
 } as any)
 const AppInsightsRoute = AppInsightsRouteImport.update({
@@ -101,6 +107,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/api/health': typeof ApiHealthRoute
   '/app/cutups': typeof AppCutupsRouteWithChildren
+  '/app/exchange': typeof AppExchangeRoute
   '/app/insights': typeof AppInsightsRoute
   '/app/library': typeof AppLibraryRoute
   '/share/$token': typeof ShareTokenRoute
@@ -116,6 +123,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/api/health': typeof ApiHealthRoute
   '/app/cutups': typeof AppCutupsRouteWithChildren
+  '/app/exchange': typeof AppExchangeRoute
   '/app/insights': typeof AppInsightsRoute
   '/app/library': typeof AppLibraryRoute
   '/share/$token': typeof ShareTokenRoute
@@ -133,6 +141,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/api/health': typeof ApiHealthRoute
   '/app/cutups': typeof AppCutupsRouteWithChildren
+  '/app/exchange': typeof AppExchangeRoute
   '/app/insights': typeof AppInsightsRoute
   '/app/library': typeof AppLibraryRoute
   '/share/$token': typeof ShareTokenRoute
@@ -151,6 +160,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/api/health'
     | '/app/cutups'
+    | '/app/exchange'
     | '/app/insights'
     | '/app/library'
     | '/share/$token'
@@ -166,6 +176,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/api/health'
     | '/app/cutups'
+    | '/app/exchange'
     | '/app/insights'
     | '/app/library'
     | '/share/$token'
@@ -182,6 +193,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/api/health'
     | '/app/cutups'
+    | '/app/exchange'
     | '/app/insights'
     | '/app/library'
     | '/share/$token'
@@ -246,6 +258,13 @@ declare module '@tanstack/react-router' {
       path: '/cutups'
       fullPath: '/app/cutups'
       preLoaderRoute: typeof AppCutupsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/exchange': {
+      id: '/app/exchange'
+      path: '/exchange'
+      fullPath: '/app/exchange'
+      preLoaderRoute: typeof AppExchangeRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/insights': {
@@ -321,6 +340,7 @@ const AppCutupsRouteWithChildren = AppCutupsRoute._addFileChildren(
 
 interface AppRouteChildren {
   AppCutupsRoute: typeof AppCutupsRouteWithChildren
+  AppExchangeRoute: typeof AppExchangeRoute
   AppInsightsRoute: typeof AppInsightsRoute
   AppLibraryRoute: typeof AppLibraryRoute
   AppIndexRoute: typeof AppIndexRoute
@@ -329,6 +349,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppCutupsRoute: AppCutupsRouteWithChildren,
+  AppExchangeRoute: AppExchangeRoute,
   AppInsightsRoute: AppInsightsRoute,
   AppLibraryRoute: AppLibraryRoute,
   AppIndexRoute: AppIndexRoute,

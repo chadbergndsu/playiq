@@ -6,6 +6,7 @@ import { seedFilms, seedPlaysForFilm, withTagCounts } from "@/lib/core/seed";
 import { applyAiToPlay, mergeTags } from "@/lib/core/tagging";
 import { createUploadedFilm, finalizeUploadedFilm } from "@/lib/core/upload";
 import { newShareToken } from "@/lib/core/export";
+import { mergeOfpIntoLibrary, type OpenFilmPackage } from "@/lib/core/ofp";
 import type {
   Cutup,
   Film,
@@ -90,6 +91,8 @@ export type PlayiqState = {
   renameCutup: (id: string, title: string) => void;
   removePlayFromCutup: (cutupId: string, playId: string) => void;
   ensureCutupShareToken: (cutupId: string) => string | null;
+  /** Import Open Film Package (portable coach exchange). */
+  importOfp: (pkg: OpenFilmPackage) => { films: number; plays: number };
 };
 
 function findPlayLocation(
@@ -322,6 +325,17 @@ export const usePlayiqStore = create<PlayiqState>()(
           ),
         }));
         return token;
+      },
+
+      importOfp: (pkg) => {
+        const state = get();
+        const merged = mergeOfpIntoLibrary(
+          { films: state.films, playsByFilm: state.playsByFilm },
+          pkg,
+        );
+        const films = withTagCounts(merged.films, merged.playsByFilm);
+        set({ films, playsByFilm: merged.playsByFilm });
+        return { films: merged.importedFilms, plays: merged.importedPlays };
       },
     }),
     {

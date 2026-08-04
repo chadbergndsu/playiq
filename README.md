@@ -20,6 +20,7 @@ PlayIQ is a Hudl-style film workflow wedge: upload/review season film, get an AI
 | **Cutups** | Teach reels: rename, remove plays, **share link**, CSV/JSON export |
 | **Public share** | `/share/$token` — no login required to view/export a published cutup |
 | **Insights** | Weekly charts, concepts, **formation tendencies**, 3rd-down conversion, down×distance matrix |
+| **Exchange (open)** | **Open Film Package** import/export, **WebVTT** chapters, **FFmpeg/EDL** lists, **Open Play Ontology**, SVG formation diagrams — portable stack competitors skip |
 | **Auth** | Better Auth (Google / X) — film room works without sign-in |
 
 Demo data is seeded client-side (persisted in the browser). **Reset demo data** on Overview restores the stock season.
@@ -78,8 +79,8 @@ npm run dev            # http://0.0.0.0:8080
 src/
   routes/           # Pages + API (landing, /app/*, auth, health)
   components/       # App shell, film UI, small UI primitives
-  lib/core/         # Framework-free domain: tagging, LLM parse, cutups, seed
-  lib/server/       # Server-only: xAI tagger (API key never in client bundle)
+  lib/core/         # Domain: tagging, LLM parse, cutups, ontology, OFP, WebVTT, EDL, SVG
+  lib/server/       # Server-only: xAI tagger, cutup shares (API key never in client)
   lib/store/        # Zustand demo state
   lib/auth/         # Better Auth (pre-wired; do not rewrite server.ts)
   lib/db.ts         # Postgres / PGLite access

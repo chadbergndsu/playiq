@@ -64,8 +64,8 @@ function Landing() {
             </h1>
             <p className="mt-5 max-w-lg text-base leading-relaxed text-fg-muted sm:text-lg">
               PlayIQ is AI-first football film analysis: auto-tag formations, concepts, and
-              situations, then correct with coach precision and ship teach cutups before
-              practice.
+              situations, then correct with coach precision and ship teach cutups — plus an
+              open exchange stack (OFP, WebVTT, FFmpeg/EDL) commercial film rooms ignore.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link to="/app">
@@ -174,6 +174,11 @@ function Landing() {
                   ["Coach tags preserved", "Varies", "Never clobbered by re-run"],
                   ["Shareable cutups", "Playlist links", "Public /share links + export"],
                   ["Tendency reports", "Assist / Sportscode", "Formations + down×distance"],
+                  [
+                    "Open exchange",
+                    "Proprietary packages",
+                    "OFP JSON · WebVTT · FFmpeg/EDL · ontology",
+                  ],
                   ["Upload → analyze", "Encode pipelines", "Intake + first-pass (encode next)"],
                   ["Ownership / price", "Platform lock-in", "Your repo, Vercel, CI gates"],
                 ].map(([cap, market, us]) => (
