@@ -114,19 +114,30 @@ docs/adr/           # Architecture decisions
 - [x] Basic tests for core logic (health, tagging, LLM parse, xAI fallback, cutups)
 - [x] GitHub Actions CI (lint → typecheck → test) on PR/push to `main`
 - [x] Secrets only via platform env / GitHub Secrets (documented)
-- [ ] Error tracking (Sentry) live for production — placeholders in `.env.example`; wire on first real prod deploy
-- [x] Deployment from Git documented (`vercel.json` + README)  
-  **Open (manual):** connect this repo in the Vercel dashboard (no Vercel token in agent env)
+- [ ] Error tracking (Sentry) live for production — placeholders in `.env.example`
+- [x] Deployment from Git — Vercel project **playiq**, GitHub connected, prod alias live
 - [x] HTTPS only (via Vercel)
 - [x] Basic health check (`GET /api/health`)
+- [x] Postgres (Neon) provisioned via Vercel Marketplace (`playiq-db`); migrations apply on build
 - [x] Dependabot enabled (`.github/dependabot.yml`)
-- [x] ADR for stack/deploy (`docs/adr/0001-stack-and-deploy.md`)
+- [x] ADRs (`docs/adr/0001`–`0003`)
 - [x] Auth via proven library (Better Auth)
 
-### Your two remaining baseline clicks
+### Production
 
-1. **Vercel:** [Import `chadbergndsu/playiq`](https://vercel.com/new) → Git-connected → env from `.env.example`.
-2. **Branch protection:** after GitHub Pro/Team (or if Rulesets work), require PR + check **`Lint · Typecheck · Test`**.
+| Item | Value |
+|------|--------|
+| App | https://playiq-three.vercel.app |
+| Vercel project | `chadbergndsus-projects/playiq` |
+| Database | Neon Free (`playiq-db`) → `DATABASE_URL` |
+| Share links | Durable via `cutup_shares` on Neon |
+
+### Still open (manual / later)
+
+1. **Branch protection:** GitHub Free private blocks classic protection (Pro/Team or Rulesets); require **`Lint · Typecheck · Test`**.
+2. **Sentry:** set `SENTRY_DSN` / `VITE_SENTRY_DSN` when ready.
+3. **SpaceXAI:** set `XAI_API_KEY` on Vercel for live LLM tagging.
+4. Custom domain (optional).
 
 ## Agent rules
 
