@@ -7,7 +7,10 @@ import {
 } from "@/lib/core/llm-tagging";
 import type { Down, Play, Side } from "@/lib/core/types";
 import { checkRateLimit, clientKey } from "@/lib/server/rate-limit";
-import { resolveApiUser } from "@/lib/server/request-auth";
+import {
+  AuthMisconfiguredError,
+  resolveApiUser,
+} from "@/lib/server/request-auth";
 import { isXaiConfigured, tagPlays } from "@/lib/server/xai-tagger";
 
 type ClientPlayInput = {
@@ -163,14 +166,16 @@ export const Route = createFileRoute("/api/film/tag")({
         // Auth-off local demo (no DATABASE_URL): treat as signed-in (DEV_USER).
         let allowLlm = false;
         try {
-          const { userId, authOn } = await resolveApiUser(request);
-          allowLlm = authOn ? Boolean(userId) : Boolean(userId);
+          const { userId } = await resolveApiUser(request);
+          allowLlm = Boolean(userId);
         } catch (err) {
-          console.error("[api/film/tag auth]", err);
-          return Response.json(
-            { error: "Auth misconfigured" },
-            { status: 503, headers: { "Cache-Control": "no-store" } },
-          );
+          if (err instanceof AuthMisconfiguredError) {
+            // Still allow heuristic tagging when auth is misconfigured.
+            allowLlm = false;
+          } else {
+            console.error("[api/film/tag auth]", err);
+            allowLlm = false;
+          }
         }
 
         let body: unknown;

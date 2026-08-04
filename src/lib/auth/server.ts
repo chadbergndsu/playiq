@@ -84,25 +84,31 @@ const usingPreviewOAuth =
   grokClientId === PREVIEW_CLIENT_ID ||
   grokClientSecret === PREVIEW_CLIENT_SECRET;
 
-// Fail closed on Vercel production: never sign sessions with preview OAuth or a
-// missing secret when a real Postgres is configured.
+/**
+ * When Postgres is configured, refuse the baked preview OAuth client and a
+ * missing BETTER_AUTH_SECRET. Do **not** throw at import (that 500s the whole
+ * app) — disable federated auth and surface the message via logs / API 503.
+ */
+export let authConfigError: string | null = null;
 if (!authDisabled && databaseUrlForAuth) {
-  const missingSecret = !env("BETTER_AUTH_SECRET");
-  if (missingSecret || usingPreviewOAuth) {
-    const msg = missingSecret
-      ? "[auth] BETTER_AUTH_SECRET is required when DATABASE_URL is set"
-      : "[auth] Set GROK_AUTH_CLIENT_ID and GROK_AUTH_CLIENT_SECRET — " +
-        "the baked preview OAuth client is not allowed with DATABASE_URL";
-    if (env("VERCEL_ENV") === "production") {
-      throw new Error(msg);
-    }
-    console.error(msg);
+  if (!env("BETTER_AUTH_SECRET")) {
+    authConfigError =
+      "BETTER_AUTH_SECRET is required when DATABASE_URL is set";
+  } else if (usingPreviewOAuth) {
+    authConfigError =
+      "Set GROK_AUTH_CLIENT_ID and GROK_AUTH_CLIENT_SECRET — " +
+      "the baked preview OAuth client is not allowed with DATABASE_URL";
+  }
+  if (authConfigError) {
+    console.error(`[auth] ${authConfigError}`);
   }
 }
 
 /** True when federated sign-in is active (real auth is enforced). */
 export const authConfigured =
-  !authDisabled && Boolean(grokClientId && grokClientSecret);
+  !authDisabled &&
+  !authConfigError &&
+  Boolean(grokClientId && grokClientSecret);
 
 // This app's own Better Auth origin. When deployed the deployer injects the
 // public URL. In the sandbox live preview there's no fixed URL (each preview gets

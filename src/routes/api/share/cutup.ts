@@ -7,6 +7,7 @@ import {
 } from "@/lib/server/cutup-share";
 import { checkRateLimit, clientKey } from "@/lib/server/rate-limit";
 import {
+  AuthMisconfiguredError,
   requireApiUser,
   unauthorizedJson,
 } from "@/lib/server/request-auth";
@@ -41,6 +42,12 @@ export const Route = createFileRoute("/api/share/cutup")({
           userId = await requireApiUser(request);
         } catch (err) {
           if (err instanceof UnauthorizedError) return unauthorizedJson();
+          if (err instanceof AuthMisconfiguredError) {
+            return Response.json(
+              { error: "Auth misconfigured" },
+              { status: 503, headers: { "Cache-Control": "no-store" } },
+            );
+          }
           console.error("[api/share/cutup POST auth]", err);
           return Response.json(
             { error: "Auth misconfigured" },

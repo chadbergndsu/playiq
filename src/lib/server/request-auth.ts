@@ -14,6 +14,14 @@ const databaseConfigured = Boolean(
   typeof process !== "undefined" && process.env.DATABASE_URL?.trim(),
 );
 
+export class AuthMisconfiguredError extends Error {
+  readonly status = 503;
+  constructor(message: string) {
+    super(message);
+    this.name = "AuthMisconfiguredError";
+  }
+}
+
 function bearerFromRequest(request: Request): string | undefined {
   const h = request.headers.get("authorization") ?? request.headers.get("Authorization");
   if (!h) return undefined;
@@ -31,9 +39,14 @@ export async function resolveApiUser(
   request: Request,
 ): Promise<{ userId: string | null; authOn: boolean }> {
   assertSameSiteRequest();
+  // Lazy-load config error so health can stay up if auth module is soft-failed.
+  const { authConfigError } = await import("@/lib/auth/server");
+  if (authConfigError) {
+    throw new AuthMisconfiguredError(authConfigError);
+  }
   if (!authConfigured) {
     if (databaseConfigured) {
-      throw new Error(
+      throw new AuthMisconfiguredError(
         "Auth is disabled but DATABASE_URL is set — refusing unscoped API writes.",
       );
     }
