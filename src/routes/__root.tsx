@@ -1,6 +1,8 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
+import { Toaster } from "sonner";
 import { AuthProvider } from "@/lib/auth/provider";
 import { CreatedWithGrokBanner } from "@/components/created-with-grok-banner";
+import { PlayiqHydrate } from "@/components/playiq-hydrate";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "PlayIQ";
@@ -31,7 +33,7 @@ export const Route = createRootRoute({
       { rel: "stylesheet", href: appCss },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap",
       },
     ],
   }),
@@ -43,7 +45,17 @@ export const Route = createRootRoute({
       <body>
         <CreatedWithGrokBanner />
         <AuthProvider>
+          <PlayiqHydrate />
           <Outlet />
+          <Toaster
+            theme="dark"
+            position="bottom-right"
+            toastOptions={{
+              classNames: {
+                toast: "bg-bg-elevated border border-border text-fg",
+              },
+            }}
+          />
         </AuthProvider>
         <Scripts />
       </body>

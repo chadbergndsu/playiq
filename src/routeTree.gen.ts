@@ -10,13 +10,25 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppRouteImport } from './routes/app'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as AppIndexRouteImport } from './routes/app/index'
+import { Route as AppCutupsRouteImport } from './routes/app/cutups'
+import { Route as AppInsightsRouteImport } from './routes/app/insights'
+import { Route as AppLibraryRouteImport } from './routes/app/library'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as AppCutupsCutupIdRouteImport } from './routes/app/cutups.$cutupId'
+import { Route as AppFilmFilmIdRouteImport } from './routes/app/film.$filmId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppRoute = AppRouteImport.update({
+  id: '/app',
+  path: '/app',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -29,41 +41,125 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
   path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppIndexRoute = AppIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCutupsRoute = AppCutupsRouteImport.update({
+  id: '/cutups',
+  path: '/cutups',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInsightsRoute = AppInsightsRouteImport.update({
+  id: '/insights',
+  path: '/insights',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppLibraryRoute = AppLibraryRouteImport.update({
+  id: '/library',
+  path: '/library',
+  getParentRoute: () => AppRoute,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppCutupsCutupIdRoute = AppCutupsCutupIdRouteImport.update({
+  id: '/$cutupId',
+  path: '/$cutupId',
+  getParentRoute: () => AppCutupsRoute,
+} as any)
+const AppFilmFilmIdRoute = AppFilmFilmIdRouteImport.update({
+  id: '/film/$filmId',
+  path: '/film/$filmId',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
   '/api/health': typeof ApiHealthRoute
+  '/app/cutups': typeof AppCutupsRouteWithChildren
+  '/app/insights': typeof AppInsightsRoute
+  '/app/library': typeof AppLibraryRoute
+  '/app/': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/app/cutups/$cutupId': typeof AppCutupsCutupIdRoute
+  '/app/film/$filmId': typeof AppFilmFilmIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/api/health': typeof ApiHealthRoute
+  '/app/cutups': typeof AppCutupsRouteWithChildren
+  '/app/insights': typeof AppInsightsRoute
+  '/app/library': typeof AppLibraryRoute
+  '/app': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/app/cutups/$cutupId': typeof AppCutupsCutupIdRoute
+  '/app/film/$filmId': typeof AppFilmFilmIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
   '/api/health': typeof ApiHealthRoute
+  '/app/cutups': typeof AppCutupsRouteWithChildren
+  '/app/insights': typeof AppInsightsRoute
+  '/app/library': typeof AppLibraryRoute
+  '/app/': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/app/cutups/$cutupId': typeof AppCutupsCutupIdRoute
+  '/app/film/$filmId': typeof AppFilmFilmIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/api/health' | '/api/auth/$'
+  fullPaths:
+    | '/'
+    | '/app'
+    | '/login'
+    | '/api/health'
+    | '/app/cutups'
+    | '/app/insights'
+    | '/app/library'
+    | '/app/'
+    | '/api/auth/$'
+    | '/app/cutups/$cutupId'
+    | '/app/film/$filmId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/api/health' | '/api/auth/$'
-  id: '__root__' | '/' | '/login' | '/api/health' | '/api/auth/$'
+  to:
+    | '/'
+    | '/login'
+    | '/api/health'
+    | '/app/cutups'
+    | '/app/insights'
+    | '/app/library'
+    | '/app'
+    | '/api/auth/$'
+    | '/app/cutups/$cutupId'
+    | '/app/film/$filmId'
+  id:
+    | '__root__'
+    | '/'
+    | '/app'
+    | '/login'
+    | '/api/health'
+    | '/app/cutups'
+    | '/app/insights'
+    | '/app/library'
+    | '/app/'
+    | '/api/auth/$'
+    | '/app/cutups/$cutupId'
+    | '/app/film/$filmId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
@@ -76,6 +172,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -92,6 +195,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app/': {
+      id: '/app/'
+      path: '/'
+      fullPath: '/app/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/cutups': {
+      id: '/app/cutups'
+      path: '/cutups'
+      fullPath: '/app/cutups'
+      preLoaderRoute: typeof AppCutupsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/insights': {
+      id: '/app/insights'
+      path: '/insights'
+      fullPath: '/app/insights'
+      preLoaderRoute: typeof AppInsightsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/library': {
+      id: '/app/library'
+      path: '/library'
+      fullPath: '/app/library'
+      preLoaderRoute: typeof AppLibraryRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -99,11 +230,56 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app/cutups/$cutupId': {
+      id: '/app/cutups/$cutupId'
+      path: '/$cutupId'
+      fullPath: '/app/cutups/$cutupId'
+      preLoaderRoute: typeof AppCutupsCutupIdRouteImport
+      parentRoute: typeof AppCutupsRoute
+    }
+    '/app/film/$filmId': {
+      id: '/app/film/$filmId'
+      path: '/film/$filmId'
+      fullPath: '/app/film/$filmId'
+      preLoaderRoute: typeof AppFilmFilmIdRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
+interface AppCutupsRouteChildren {
+  AppCutupsCutupIdRoute: typeof AppCutupsCutupIdRoute
+}
+
+const AppCutupsRouteChildren: AppCutupsRouteChildren = {
+  AppCutupsCutupIdRoute: AppCutupsCutupIdRoute,
+}
+
+const AppCutupsRouteWithChildren = AppCutupsRoute._addFileChildren(
+  AppCutupsRouteChildren,
+)
+
+interface AppRouteChildren {
+  AppCutupsRoute: typeof AppCutupsRouteWithChildren
+  AppInsightsRoute: typeof AppInsightsRoute
+  AppLibraryRoute: typeof AppLibraryRoute
+  AppIndexRoute: typeof AppIndexRoute
+  AppFilmFilmIdRoute: typeof AppFilmFilmIdRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppCutupsRoute: AppCutupsRouteWithChildren,
+  AppInsightsRoute: AppInsightsRoute,
+  AppLibraryRoute: AppLibraryRoute,
+  AppIndexRoute: AppIndexRoute,
+  AppFilmFilmIdRoute: AppFilmFilmIdRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,

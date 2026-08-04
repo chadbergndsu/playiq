@@ -2,13 +2,25 @@
 
 AI-first football film analysis for coaches and programs.
 
-**Status:** Solid Systems baseline solid. Product features not started yet.
-
-**Repo:** [chadbergndsu/playiq](https://github.com/chadbergndsu/playiq) (private)
+**Status:** Product demo live — film library, AI tagging, review workspace, cutups, insights.
 
 ## Purpose
 
-PlayIQ is a private product scaffold aimed at football video workflows: capture, auto-tag, review, and teach. This repository ships the engineering baseline required by [Solid Systems Standards](https://github.com/chadbergndsu/solid-systems-standards) before product work.
+PlayIQ is a Hudl-style film workflow wedge: upload/review season film, get an AI first-pass of formations/concepts/situations, correct with coach tags, and ship teach cutups before practice.
+
+## What’s in the app
+
+| Area | What you can do |
+|------|-----------------|
+| **Landing** | Product pitch + enter film room |
+| **Overview** | Season stats, recent film, top concepts |
+| **Film library** | 8-game demo season, search/filter by status |
+| **Film review** | Timeline, play list, demo stage, AI + coach tags, notes, keyboard J/K/Space |
+| **Cutups** | Filtered teach reels (save from any film filter) |
+| **Insights** | Weekly charts, concept frequency, situation counts |
+| **Auth** | Better Auth (Google / X) — film room works without sign-in |
+
+Demo data is seeded client-side (persisted in the browser). **Reset demo data** on Overview restores the stock season.
 
 ## Tech stack
 
@@ -16,9 +28,11 @@ PlayIQ is a private product scaffold aimed at football video workflows: capture,
 |-------|--------|
 | App | TanStack Start (React 19 + Vite 8) |
 | Language | TypeScript (strict) |
-| Styling | Tailwind CSS v4 |
+| Styling | Tailwind CSS v4 — dark film-room tokens |
+| State | Zustand (persist) |
 | Auth | Better Auth + Grok broker (Google, X) |
 | Database | Postgres (`DATABASE_URL`) / PGLite in preview |
+| Charts | Recharts |
 | Deploy | Vercel (Git-connected, default) |
 | Quality | ESLint, Prettier, `tsc`, `node:test` + `tsx`, GitHub Actions |
 
@@ -47,9 +61,11 @@ npm run dev            # http://0.0.0.0:8080
 
 ```
 src/
-  routes/           # TanStack file routes (pages + API)
+  routes/           # Pages + API (landing, /app/*, auth, health)
+  components/       # App shell, film UI, small UI primitives
+  lib/core/         # Framework-free domain: tagging, cutups, seed (unit-tested)
+  lib/store/        # Zustand demo state
   lib/auth/         # Better Auth (pre-wired; do not rewrite server.ts)
-  lib/core/         # Framework-free domain logic (unit-tested)
   lib/db.ts         # Postgres / PGLite access
 migrations/         # Ordered SQL migrations
 .github/workflows/  # CI gates
@@ -63,35 +79,38 @@ docs/adr/           # Architecture decisions
 ## Deploy
 
 1. Private GitHub repo: [chadbergndsu/playiq](https://github.com/chadbergndsu/playiq).
-2. In [Vercel](https://vercel.com/new): **Import** → select `chadbergndsu/playiq` (Git-connected).
+2. Import the repo in [Vercel](https://vercel.com) (Git-connected).
 3. Set env vars from `.env.example` in the Vercel project (never commit secrets).
 4. Push to `main` → production deploy. PRs get preview URLs automatically.
 5. HTTPS is enforced by Vercel.
 
-Framework: custom (`vercel.json` sets `buildCommand` / `installCommand`). Root directory: repo root.
-
 ## Solid Systems Done checklist
 
-| Item | Status |
-|------|--------|
-| GitHub repo created (private) | **Done** — [chadbergndsu/playiq](https://github.com/chadbergndsu/playiq) |
-| Baseline committed & pushed to `main` | **Done** — CI green on first push |
-| Main branch protected + required PR reviews / status checks | **Open** — GitHub Free private repos cannot enable classic branch protection (needs Pro/Team or public). Enable after upgrade or via Rulesets if available. |
-| Clear README | **Done** |
-| `.env.example` (no real secrets committed) | **Done** |
-| Proper `.gitignore` | **Done** |
-| Linter + formatter (ESLint + Prettier) | **Done** — runs in CI |
-| TypeScript enabled | **Done** |
-| Basic tests for core logic | **Done** — `src/lib/core/health.test.ts` |
-| GitHub Actions CI (lint → typecheck → test) | **Done** — passes on `main` / PRs |
-| Secrets only via platform env / GitHub Secrets | **Done** — documented |
-| Error tracking (Sentry) live for production | **Open** — `SENTRY_DSN` placeholders in `.env.example`; wire when first prod deploy |
-| Deployment from Git (Vercel default) | **Ready** — `vercel.json` + README; **Git-connect still needs one Vercel Import** (no Vercel token in agent) |
-| HTTPS only | **Done** — via Vercel |
-| Basic health check | **Done** — `GET /api/health` |
-| Dependabot | **Done** — `.github/dependabot.yml` |
-| ADR for stack/deploy | **Done** — `docs/adr/0001-stack-and-deploy.md` |
-| Auth via proven library | **Done** — Better Auth |
+- [x] GitHub repo created (private by default) — [chadbergndsu/playiq](https://github.com/chadbergndsu/playiq)
+- [x] Baseline code pushed to `main` + CI green on push
+- [ ] Main branch protection + required PR reviews / status checks  
+  **Blocked:** GitHub Free private repos reject classic branch protection (needs Pro/Team, or public, or Rulesets if available). When available, require status check **`Lint · Typecheck · Test`**.
+- [x] Clear README (purpose, stack, setup, architecture, deploy)
+- [x] `.env.example` present (no real secrets committed)
+- [x] Proper `.gitignore`
+- [x] Linter + formatter configured (ESLint + Prettier)
+- [x] TypeScript enabled
+- [x] Basic tests for core logic (health, tagging, cutups)
+- [x] GitHub Actions CI (lint → typecheck → test) on PR/push to `main`
+- [x] Secrets only via platform env / GitHub Secrets (documented)
+- [ ] Error tracking (Sentry) live for production — placeholders in `.env.example`; wire on first real prod deploy
+- [x] Deployment from Git documented (`vercel.json` + README)  
+  **Open (manual):** connect this repo in the Vercel dashboard (no Vercel token in agent env)
+- [x] HTTPS only (via Vercel)
+- [x] Basic health check (`GET /api/health`)
+- [x] Dependabot enabled (`.github/dependabot.yml`)
+- [x] ADR for stack/deploy (`docs/adr/0001-stack-and-deploy.md`)
+- [x] Auth via proven library (Better Auth)
+
+### Your two remaining baseline clicks
+
+1. **Vercel:** [Import `chadbergndsu/playiq`](https://vercel.com/new) → Git-connected → env from `.env.example`.
+2. **Branch protection:** after GitHub Pro/Team (or if Rulesets work), require PR + check **`Lint · Typecheck · Test`**.
 
 ## Agent rules
 
@@ -99,4 +118,4 @@ See [`AGENTS.md`](./AGENTS.md) (Solid Systems Standards v1.3 embedded).
 
 ---
 
-*Solid Systems Standards v1.3 — baseline bootstrapped 2026-08-03*
+*Solid Systems Standards v1.3 — product demo 2026-08-03*
