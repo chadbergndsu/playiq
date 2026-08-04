@@ -52,6 +52,8 @@ export type Play = {
   yardsGained?: number;
   tags: PlayTag[];
   notes?: string;
+  /** Coach bookmark for install / teach reels */
+  starred?: boolean;
 };
 
 export type Film = {
@@ -72,6 +74,10 @@ export type Film = {
   /** Deterministic hue for thumbnail wash */
   thumbnailHue: number;
   createdAt: string;
+  /** Optional local object URL / name from coach upload (demo) */
+  sourceFileName?: string;
+  /** True when created via Upload film path */
+  isUpload?: boolean;
 };
 
 export type Cutup = {
@@ -82,6 +88,8 @@ export type Cutup = {
   filterSummary: string;
   createdAt: string;
   updatedAt: string;
+  /** Public share token when published */
+  shareToken?: string;
 };
 
 export type LibraryFilter = {
@@ -96,4 +104,34 @@ export type PlayFilter = {
   concept: string | "all";
   down: Down | "all";
   source: TagSource | "all";
+  /** When true, only starred plays */
+  starredOnly?: boolean;
+};
+
+/** Portable cutup payload for share links / export (no secrets). */
+export type CutupShareSnapshot = {
+  version: 1;
+  token: string;
+  title: string;
+  description: string;
+  filterSummary: string;
+  createdAt: string;
+  plays: Array<{
+    id: string;
+    filmTitle: string;
+    opponent: string;
+    index: number;
+    side: Side;
+    down?: Down;
+    distance?: number;
+    yardLine?: number;
+    clock: string;
+    quarter: 1 | 2 | 3 | 4;
+    yardsGained?: number;
+    result?: PlayResult;
+    tags: Array<{ category: TagCategory; label: string; source: TagSource }>;
+    notes?: string;
+    startSec: number;
+    endSec: number;
+  }>;
 };

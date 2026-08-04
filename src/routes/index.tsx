@@ -130,12 +130,12 @@ function Landing() {
             {
               icon: Timer,
               title: "Coach-speed review",
-              body: "Timeline, keyboard step, and one-click coach tags that never get overwritten.",
+              body: "Playback speeds, deep filters, star plays, keyboard shortcuts — film room power tools.",
             },
             {
               icon: Scissors,
               title: "Cutups that teach",
-              body: "Save filtered playlists for install meetings and position rooms.",
+              body: "Shareable install links, CSV/JSON export, rename and trim playlists.",
             },
             {
               icon: Shield,
@@ -149,6 +149,43 @@ function Landing() {
               <p className="mt-2 text-sm leading-relaxed text-fg-muted">{f.body}</p>
             </article>
           ))}
+        </section>
+
+        <section className="mt-16">
+          <h2 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl">
+            Where we sit vs the market
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm text-fg-muted">
+            Hudl, QwikCut, Sportscode, and VidSwap own capture, exchange, and desktop coding.
+            PlayIQ wedges on AI-first tagging and a modern coach web film room you own.
+          </p>
+          <div className="mt-6 overflow-x-auto rounded-[var(--radius-lg)] border border-border">
+            <table className="w-full min-w-[36rem] text-left text-sm">
+              <thead>
+                <tr className="border-b border-border bg-bg-elevated text-xs uppercase tracking-wide text-fg-subtle">
+                  <th className="px-4 py-3 font-medium">Capability</th>
+                  <th className="px-4 py-3 font-medium">Typical market</th>
+                  <th className="px-4 py-3 font-medium">PlayIQ</th>
+                </tr>
+              </thead>
+              <tbody className="text-fg-muted">
+                {[
+                  ["AI first-pass tags", "Assist add-on / slow", "Built-in (heuristics + SpaceXAI)"],
+                  ["Coach tags preserved", "Varies", "Never clobbered by re-run"],
+                  ["Shareable cutups", "Playlist links", "Public /share links + export"],
+                  ["Tendency reports", "Assist / Sportscode", "Formations + down×distance"],
+                  ["Upload → analyze", "Encode pipelines", "Intake + first-pass (encode next)"],
+                  ["Ownership / price", "Platform lock-in", "Your repo, Vercel, CI gates"],
+                ].map(([cap, market, us]) => (
+                  <tr key={cap} className="border-b border-border/70">
+                    <td className="px-4 py-3 font-medium text-fg">{cap}</td>
+                    <td className="px-4 py-3">{market}</td>
+                    <td className="px-4 py-3 text-fg">{us}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <section className="mt-16 panel flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">

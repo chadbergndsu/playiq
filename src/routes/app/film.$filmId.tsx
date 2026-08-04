@@ -1,16 +1,16 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { ArrowLeft, Scissors, Sparkles } from "lucide-react";
+import { ArrowLeft, Keyboard, Scissors, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { PlayDetail } from "@/components/film/play-detail";
 import { PlayList } from "@/components/film/play-list";
 import { FilmStatusBadge } from "@/components/film/status-badge";
 import { FilmTimeline } from "@/components/film/timeline";
-import { VideoStage } from "@/components/film/video-stage";
+import { VideoStage, type PlaybackSpeed } from "@/components/film/video-stage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { PlayFilter, PlayTag, Side } from "@/lib/core/types";
-import { filterPlays } from "@/lib/core/cutups";
+import type { Down, PlayFilter, PlayTag, Side, TagSource } from "@/lib/core/types";
+import { filterPlays, listConceptLabels } from "@/lib/core/cutups";
 import { filmById, playsForFilm, usePlayiqStore } from "@/lib/store/playiq-store";
 
 export const Route = createFileRoute("/app/film/$filmId")({
@@ -64,28 +64,38 @@ function FilmReviewPage() {
   const addCoachTag = usePlayiqStore((s) => s.addCoachTag);
   const removeTag = usePlayiqStore((s) => s.removeTag);
   const setPlayNote = usePlayiqStore((s) => s.setPlayNote);
+  const toggleStarPlay = usePlayiqStore((s) => s.toggleStarPlay);
   const reanalyzeFilm = usePlayiqStore((s) => s.reanalyzeFilm);
   const applyAiTagsForFilm = usePlayiqStore((s) => s.applyAiTagsForFilm);
   const createCutupFromFilter = usePlayiqStore((s) => s.createCutupFromFilter);
   const [tagging, setTagging] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const film = useMemo(() => filmById(films, filmId), [films, filmId]);
   const plays = useMemo(() => playsForFilm(playsByFilm, filmId), [playsByFilm, filmId]);
 
   const [side, setSide] = useState<Side | "all">("all");
+  const [down, setDown] = useState<Down | "all">("all");
+  const [concept, setConcept] = useState<string | "all">("all");
+  const [source, setSource] = useState<TagSource | "all">("all");
+  const [starredOnly, setStarredOnly] = useState(false);
   const [query, setQuery] = useState("");
   const [playing, setPlaying] = useState(false);
+  const [speed, setSpeed] = useState<PlaybackSpeed>(1);
   const [currentSec, setCurrentSec] = useState(0);
+
+  const concepts = useMemo(() => listConceptLabels(plays), [plays]);
 
   const filter: PlayFilter = useMemo(
     () => ({
       query,
       side,
-      concept: "all",
-      down: "all",
-      source: "all",
+      concept,
+      down,
+      source,
+      starredOnly,
     }),
-    [query, side],
+    [query, side, concept, down, source, starredOnly],
   );
 
   const visible = useMemo(() => filterPlays(plays, filter), [plays, filter]);
@@ -103,36 +113,39 @@ function FilmReviewPage() {
 
   useEffect(() => {
     if (!playing || !selected) return;
+    const tickMs = Math.max(50, Math.round(250 / speed));
+    const step = 0.25 * speed;
     const id = window.setInterval(() => {
       setCurrentSec((t) => {
-        const next = t + 0.25;
+        const next = t + step;
         if (next >= selected.endSec) {
           setPlaying(false);
           return selected.endSec;
         }
         return next;
       });
-    }, 250);
+    }, tickMs);
     return () => window.clearInterval(id);
-  }, [playing, selected]);
+  }, [playing, selected, speed]);
 
   const stepPlay = useCallback(
     (dir: -1 | 1) => {
       if (!selected) return;
-      const idx = plays.findIndex((p) => p.id === selected.id);
-      const next = plays[idx + dir];
+      const list = visible.length ? visible : plays;
+      const idx = list.findIndex((p) => p.id === selected.id);
+      const next = list[idx + dir];
       if (next) {
         selectPlay(next.id);
         setCurrentSec(next.startSec);
       }
     },
-    [plays, selected, selectPlay],
+    [plays, visible, selected, selectPlay],
   );
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       if (e.code === "Space") {
         e.preventDefault();
         setPlaying((p) => !p);
@@ -140,11 +153,25 @@ function FilmReviewPage() {
         stepPlay(1);
       } else if (e.key === "k" || e.key === "K") {
         stepPlay(-1);
+      } else if (e.key === "s" || e.key === "S") {
+        if (selected) {
+          toggleStarPlay(selected.id);
+          toast.message(selected.starred ? "Unstarred" : "Starred for install");
+        }
+      } else if (e.key === "?" || (e.shiftKey && e.key === "/")) {
+        e.preventDefault();
+        setHelpOpen((o) => !o);
+      } else if (e.key === "1" || e.key === "2" || e.key === "3" || e.key === "4") {
+        setDown(Number(e.key) as Down);
+      } else if (e.key === "0") {
+        setDown("all");
+      } else if (e.key === "Escape") {
+        setHelpOpen(false);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [stepPlay]);
+  }, [stepPlay, selected, toggleStarPlay]);
 
   if (!film) {
     return (
@@ -177,10 +204,21 @@ function FilmReviewPage() {
             </div>
             <p className="mt-1 text-sm text-fg-muted">
               Week {film.week} · {film.date} · {film.venue} · {plays.length} plays
+              {film.sourceFileName ? ` · ${film.sourceFileName}` : ""}
             </p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setHelpOpen(true)}
+            aria-label="Keyboard shortcuts"
+          >
+            <Keyboard className="h-4 w-4" />
+            Keys
+          </Button>
           <Button
             type="button"
             variant="secondary"
@@ -201,7 +239,6 @@ function FilmReviewPage() {
                       : `${via}. Coach tags preserved.`,
                   });
                 } catch (err) {
-                  // Offline / route not ready — keep film room usable
                   reanalyzeFilm(film.id);
                   const msg = err instanceof Error ? err.message : "Request failed";
                   toast.message("Used offline heuristics", {
@@ -221,7 +258,7 @@ function FilmReviewPage() {
             variant="primary"
             onClick={() => {
               createCutupFromFilter(`${film.opponent} — filtered cut`, film.id, filter);
-              toast.success("Cutup created", { description: "Open Cutups to review." });
+              toast.success("Cutup created", { description: "Open Cutups to share or export." });
             }}
           >
             <Scissors className="h-4 w-4" />
@@ -237,6 +274,8 @@ function FilmReviewPage() {
         currentSec={currentSec}
         durationSec={film.durationSec}
         playing={playing}
+        speed={speed}
+        onSpeedChange={setSpeed}
         playLabel={
           selected
             ? `Play ${selected.index} · ${selected.side}${selected.down != null ? ` · ${selected.down}&${selected.distance}` : ""}`
@@ -259,7 +298,7 @@ function FilmReviewPage() {
         }}
       />
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,300px)_minmax(0,1fr)]">
         <div className="space-y-3">
           <div className="flex flex-wrap gap-1.5">
             {(["all", "offense", "defense", "special"] as const).map((s) => (
@@ -276,13 +315,77 @@ function FilmReviewPage() {
                 {s}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={() => setStarredOnly((v) => !v)}
+              className={
+                starredOnly
+                  ? "h-8 rounded-full bg-fg px-3 text-xs font-medium text-bg"
+                  : "h-8 rounded-full border border-border px-3 text-xs font-medium text-fg-muted"
+              }
+            >
+              Starred
+            </button>
           </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <label className="text-xs text-fg-subtle">
+              Down
+              <select
+                value={down === "all" ? "all" : String(down)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setDown(v === "all" ? "all" : (Number(v) as Down));
+                }}
+                className="mt-1 h-9 w-full rounded-[var(--radius-sm)] border border-border bg-bg px-2 text-sm text-fg focus-ring"
+              >
+                <option value="all">All</option>
+                <option value="1">1st</option>
+                <option value="2">2nd</option>
+                <option value="3">3rd</option>
+                <option value="4">4th</option>
+              </select>
+            </label>
+            <label className="text-xs text-fg-subtle">
+              Tag source
+              <select
+                value={source}
+                onChange={(e) => setSource(e.target.value as TagSource | "all")}
+                className="mt-1 h-9 w-full rounded-[var(--radius-sm)] border border-border bg-bg px-2 text-sm text-fg focus-ring"
+              >
+                <option value="all">All</option>
+                <option value="ai">AI</option>
+                <option value="coach">Coach</option>
+                <option value="import">Import</option>
+              </select>
+            </label>
+          </div>
+
+          <label className="block text-xs text-fg-subtle">
+            Concept
+            <select
+              value={concept}
+              onChange={(e) => setConcept(e.target.value)}
+              className="mt-1 h-9 w-full rounded-[var(--radius-sm)] border border-border bg-bg px-2 text-sm text-fg focus-ring"
+            >
+              <option value="all">All concepts</option>
+              {concepts.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </label>
+
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Filter plays / tags…"
             aria-label="Filter plays"
           />
+          <p className="text-xs text-fg-subtle">
+            Showing {visible.length} of {plays.length}
+          </p>
           <div className="max-h-[28rem] overflow-y-auto rounded-[var(--radius-lg)]">
             <PlayList
               plays={visible}
@@ -304,6 +407,10 @@ function FilmReviewPage() {
             }}
             onRemoveTag={(tagId) => removeTag(selected.id, tagId)}
             onNote={(notes) => setPlayNote(selected.id, notes)}
+            onToggleStar={() => {
+              toggleStarPlay(selected.id);
+              toast.message(selected.starred ? "Unstarred" : "Starred for install");
+            }}
           />
         ) : (
           <div className="panel grid place-items-center p-10 text-sm text-fg-muted">
@@ -311,6 +418,58 @@ function FilmReviewPage() {
           </div>
         )}
       </div>
+
+      {helpOpen && (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-bg/80 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="keys-title"
+          onClick={() => setHelpOpen(false)}
+        >
+          <div
+            className="panel w-full max-w-md p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="keys-title" className="font-display text-2xl font-semibold">
+              Keyboard shortcuts
+            </h2>
+            <ul className="mt-4 space-y-2 text-sm text-fg-muted">
+              <li>
+                <kbd className="rounded border border-border px-1.5 py-0.5 text-fg">Space</kbd>{" "}
+                Play / pause
+              </li>
+              <li>
+                <kbd className="rounded border border-border px-1.5 py-0.5 text-fg">J</kbd> /{" "}
+                <kbd className="rounded border border-border px-1.5 py-0.5 text-fg">K</kbd> Next /
+                previous play (filtered list)
+              </li>
+              <li>
+                <kbd className="rounded border border-border px-1.5 py-0.5 text-fg">S</kbd> Star /
+                unstar play
+              </li>
+              <li>
+                <kbd className="rounded border border-border px-1.5 py-0.5 text-fg">1</kbd>–
+                <kbd className="rounded border border-border px-1.5 py-0.5 text-fg">4</kbd> Filter
+                by down · <kbd className="rounded border border-border px-1.5 py-0.5 text-fg">0</kbd>{" "}
+                all downs
+              </li>
+              <li>
+                <kbd className="rounded border border-border px-1.5 py-0.5 text-fg">?</kbd> Toggle
+                this help
+              </li>
+            </ul>
+            <Button
+              type="button"
+              variant="secondary"
+              className="mt-5"
+              onClick={() => setHelpOpen(false)}
+            >
+              Close
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

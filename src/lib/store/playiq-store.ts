@@ -4,6 +4,8 @@ import { buildCutup } from "@/lib/core/cutups";
 import { playToSignal } from "@/lib/core/llm-tagging";
 import { seedFilms, seedPlaysForFilm, withTagCounts } from "@/lib/core/seed";
 import { applyAiToPlay, mergeTags } from "@/lib/core/tagging";
+import { createUploadedFilm, finalizeUploadedFilm } from "@/lib/core/upload";
+import { newShareToken } from "@/lib/core/export";
 import type {
   Cutup,
   Film,
@@ -12,6 +14,7 @@ import type {
   PlayFilter,
   PlayTag,
   TagSource,
+  Venue,
 } from "@/lib/core/types";
 
 const EMPTY_PLAYS: Play[] = [];
@@ -68,15 +71,25 @@ export type PlayiqState = {
   addCoachTag: (playId: string, label: string, category?: PlayTag["category"]) => void;
   removeTag: (playId: string, tagId: string) => void;
   setPlayNote: (playId: string, notes: string) => void;
+  toggleStarPlay: (playId: string) => void;
   selectPlay: (playId: string | null) => void;
   setLibraryQuery: (q: string) => void;
   setLibraryStatus: (s: FilmStatus | "all") => void;
   reanalyzeFilm: (filmId: string) => void;
-  /** Merge server/LLM AI tags per play without clobbering coach tags. */
   applyAiTagsForFilm: (filmId: string, playTags: Record<string, PlayTag[]>) => void;
   markFilmReady: (filmId: string) => void;
+  uploadFilm: (input: {
+    opponent: string;
+    week: number;
+    venue?: Venue;
+    fileName?: string;
+    durationSec?: number;
+  }) => string;
   createCutupFromFilter: (title: string, filmId: string | "all", filter: PlayFilter) => string;
   deleteCutup: (id: string) => void;
+  renameCutup: (id: string, title: string) => void;
+  removePlayFromCutup: (cutupId: string, playId: string) => void;
+  ensureCutupShareToken: (cutupId: string) => string | null;
 };
 
 function findPlayLocation(
@@ -175,6 +188,20 @@ export const usePlayiqStore = create<PlayiqState>()(
         });
       },
 
+      toggleStarPlay: (playId) => {
+        const loc = findPlayLocation(get().playsByFilm, playId);
+        if (!loc) return;
+        set((state) => {
+          const plays = [...(state.playsByFilm[loc.filmId] ?? EMPTY_PLAYS)];
+          const play = plays[loc.index];
+          if (!play) return state;
+          plays[loc.index] = { ...play, starred: !play.starred };
+          return {
+            playsByFilm: { ...state.playsByFilm, [loc.filmId]: plays },
+          };
+        });
+      },
+
       reanalyzeFilm: (filmId) => {
         set((state) => {
           const plays = (state.playsByFilm[filmId] ?? EMPTY_PLAYS).map((p) =>
@@ -223,6 +250,26 @@ export const usePlayiqStore = create<PlayiqState>()(
         }));
       },
 
+      uploadFilm: (input) => {
+        const { film, plays } = createUploadedFilm(input);
+        set((state) => {
+          const playsByFilm = { ...state.playsByFilm, [film.id]: plays };
+          const films = withTagCounts([film, ...state.films], playsByFilm);
+          return { films, playsByFilm };
+        });
+        // Simulate encode + AI pipeline finishing shortly after upload
+        const id = film.id;
+        setTimeout(() => {
+          set((state) => {
+            const films = state.films.map((f) =>
+              f.id === id ? finalizeUploadedFilm(f) : f,
+            );
+            return { films: withTagCounts(films, state.playsByFilm) };
+          });
+        }, 1800);
+        return id;
+      },
+
       createCutupFromFilter: (title, filmId, filter) => {
         const id = `cut_${Date.now()}`;
         const plays =
@@ -235,9 +282,50 @@ export const usePlayiqStore = create<PlayiqState>()(
       },
 
       deleteCutup: (id) => set((s) => ({ cutups: s.cutups.filter((c) => c.id !== id) })),
+
+      renameCutup: (id, title) => {
+        const trimmed = title.trim();
+        if (!trimmed) return;
+        set((s) => ({
+          cutups: s.cutups.map((c) =>
+            c.id === id
+              ? { ...c, title: trimmed, updatedAt: new Date().toISOString() }
+              : c,
+          ),
+        }));
+      },
+
+      removePlayFromCutup: (cutupId, playId) => {
+        set((s) => ({
+          cutups: s.cutups.map((c) =>
+            c.id === cutupId
+              ? {
+                  ...c,
+                  playIds: c.playIds.filter((id) => id !== playId),
+                  updatedAt: new Date().toISOString(),
+                }
+              : c,
+          ),
+        }));
+      },
+
+      ensureCutupShareToken: (cutupId) => {
+        const cut = get().cutups.find((c) => c.id === cutupId);
+        if (!cut) return null;
+        if (cut.shareToken) return cut.shareToken;
+        const token = newShareToken();
+        set((s) => ({
+          cutups: s.cutups.map((c) =>
+            c.id === cutupId
+              ? { ...c, shareToken: token, updatedAt: new Date().toISOString() }
+              : c,
+          ),
+        }));
+        return token;
+      },
     }),
     {
-      name: "playiq-demo-v2",
+      name: "playiq-demo-v3",
       skipHydration: true,
       partialize: (s) => ({
         films: s.films,
@@ -260,7 +348,8 @@ export function libraryFilmList(
     return (
       f.title.toLowerCase().includes(q) ||
       f.opponent.toLowerCase().includes(q) ||
-      `week ${f.week}`.includes(q)
+      `week ${f.week}`.includes(q) ||
+      (f.sourceFileName?.toLowerCase().includes(q) ?? false)
     );
   });
 }
@@ -279,10 +368,11 @@ export function cutupPlays(
 ): Play[] {
   const cut = cutups.find((c) => c.id === cutupId);
   if (!cut) return EMPTY_PLAYS;
-  const set = new Set(cut.playIds);
+  const order = new Map(cut.playIds.map((id, i) => [id, i]));
   return Object.values(playsByFilm)
     .flat()
-    .filter((p) => set.has(p.id));
+    .filter((p) => order.has(p.id))
+    .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
 }
 
 export function filmById(films: Film[], id: string): Film | undefined {

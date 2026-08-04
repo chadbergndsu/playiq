@@ -92,6 +92,23 @@ describe("filterPlays", () => {
     assert.equal(filterPlays(plays, filter).length, 1);
     assert.equal(filterPlays(plays, filter)[0]!.id, "p3");
   });
+
+  it("filters starred only", () => {
+    const withStar: Play[] = [
+      ...plays,
+      { ...plays[0]!, id: "p1s", starred: true },
+    ];
+    const filter: PlayFilter = {
+      query: "",
+      side: "all",
+      concept: "all",
+      down: "all",
+      source: "all",
+      starredOnly: true,
+    };
+    assert.equal(filterPlays(withStar, filter).length, 1);
+    assert.equal(filterPlays(withStar, filter)[0]!.id, "p1s");
+  });
 });
 
 describe("buildCutup", () => {

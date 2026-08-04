@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Plus, Star, X } from "lucide-react";
 import type { Play } from "@/lib/core/types";
 import { confidenceBand } from "@/lib/core/tagging";
 import { formatYards } from "@/lib/utils";
@@ -13,11 +13,13 @@ export function PlayDetail({
   onAddTag,
   onRemoveTag,
   onNote,
+  onToggleStar,
 }: {
   play: Play;
   onAddTag: (label: string) => void;
   onRemoveTag: (tagId: string) => void;
   onNote: (notes: string) => void;
+  onToggleStar?: () => void;
 }) {
   const [draft, setDraft] = useState("");
 
@@ -43,7 +45,20 @@ export function PlayDetail({
             {play.hash ? ` · Hash ${play.hash}` : ""}
           </p>
         </div>
-        <div className="text-right">
+        <div className="flex flex-col items-end gap-2">
+          {onToggleStar && (
+            <Button
+              type="button"
+              variant={play.starred ? "primary" : "secondary"}
+              size="sm"
+              onClick={onToggleStar}
+              aria-pressed={Boolean(play.starred)}
+              aria-label={play.starred ? "Unstar play" : "Star play"}
+            >
+              <Star className={`h-4 w-4 ${play.starred ? "fill-current" : ""}`} />
+              {play.starred ? "Starred" : "Star"}
+            </Button>
+          )}
           {play.yardsGained != null && (
             <p className="font-display text-3xl font-semibold tabular">
               {formatYards(play.yardsGained)}

@@ -17,8 +17,10 @@ import { Route as AppIndexRouteImport } from './routes/app/index'
 import { Route as AppCutupsRouteImport } from './routes/app/cutups'
 import { Route as AppInsightsRouteImport } from './routes/app/insights'
 import { Route as AppLibraryRouteImport } from './routes/app/library'
+import { Route as ShareTokenRouteImport } from './routes/share.$token'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiFilmTagRouteImport } from './routes/api/film/tag'
+import { Route as ApiShareCutupRouteImport } from './routes/api/share/cutup'
 import { Route as AppCutupsCutupIdRouteImport } from './routes/app/cutups.$cutupId'
 import { Route as AppFilmFilmIdRouteImport } from './routes/app/film.$filmId'
 
@@ -62,6 +64,11 @@ const AppLibraryRoute = AppLibraryRouteImport.update({
   path: '/library',
   getParentRoute: () => AppRoute,
 } as any)
+const ShareTokenRoute = ShareTokenRouteImport.update({
+  id: '/share/$token',
+  path: '/share/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -70,6 +77,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
 const ApiFilmTagRoute = ApiFilmTagRouteImport.update({
   id: '/api/film/tag',
   path: '/api/film/tag',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiShareCutupRoute = ApiShareCutupRouteImport.update({
+  id: '/api/share/cutup',
+  path: '/api/share/cutup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppCutupsCutupIdRoute = AppCutupsCutupIdRouteImport.update({
@@ -91,9 +103,11 @@ export interface FileRoutesByFullPath {
   '/app/cutups': typeof AppCutupsRouteWithChildren
   '/app/insights': typeof AppInsightsRoute
   '/app/library': typeof AppLibraryRoute
+  '/share/$token': typeof ShareTokenRoute
   '/app/': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/film/tag': typeof ApiFilmTagRoute
+  '/api/share/cutup': typeof ApiShareCutupRoute
   '/app/cutups/$cutupId': typeof AppCutupsCutupIdRoute
   '/app/film/$filmId': typeof AppFilmFilmIdRoute
 }
@@ -104,9 +118,11 @@ export interface FileRoutesByTo {
   '/app/cutups': typeof AppCutupsRouteWithChildren
   '/app/insights': typeof AppInsightsRoute
   '/app/library': typeof AppLibraryRoute
+  '/share/$token': typeof ShareTokenRoute
   '/app': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/film/tag': typeof ApiFilmTagRoute
+  '/api/share/cutup': typeof ApiShareCutupRoute
   '/app/cutups/$cutupId': typeof AppCutupsCutupIdRoute
   '/app/film/$filmId': typeof AppFilmFilmIdRoute
 }
@@ -119,9 +135,11 @@ export interface FileRoutesById {
   '/app/cutups': typeof AppCutupsRouteWithChildren
   '/app/insights': typeof AppInsightsRoute
   '/app/library': typeof AppLibraryRoute
+  '/share/$token': typeof ShareTokenRoute
   '/app/': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/film/tag': typeof ApiFilmTagRoute
+  '/api/share/cutup': typeof ApiShareCutupRoute
   '/app/cutups/$cutupId': typeof AppCutupsCutupIdRoute
   '/app/film/$filmId': typeof AppFilmFilmIdRoute
 }
@@ -135,9 +153,11 @@ export interface FileRouteTypes {
     | '/app/cutups'
     | '/app/insights'
     | '/app/library'
+    | '/share/$token'
     | '/app/'
     | '/api/auth/$'
     | '/api/film/tag'
+    | '/api/share/cutup'
     | '/app/cutups/$cutupId'
     | '/app/film/$filmId'
   fileRoutesByTo: FileRoutesByTo
@@ -148,9 +168,11 @@ export interface FileRouteTypes {
     | '/app/cutups'
     | '/app/insights'
     | '/app/library'
+    | '/share/$token'
     | '/app'
     | '/api/auth/$'
     | '/api/film/tag'
+    | '/api/share/cutup'
     | '/app/cutups/$cutupId'
     | '/app/film/$filmId'
   id:
@@ -162,9 +184,11 @@ export interface FileRouteTypes {
     | '/app/cutups'
     | '/app/insights'
     | '/app/library'
+    | '/share/$token'
     | '/app/'
     | '/api/auth/$'
     | '/api/film/tag'
+    | '/api/share/cutup'
     | '/app/cutups/$cutupId'
     | '/app/film/$filmId'
   fileRoutesById: FileRoutesById
@@ -174,8 +198,10 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
   ApiHealthRoute: typeof ApiHealthRoute
+  ShareTokenRoute: typeof ShareTokenRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiFilmTagRoute: typeof ApiFilmTagRoute
+  ApiShareCutupRoute: typeof ApiShareCutupRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -236,6 +262,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppLibraryRouteImport
       parentRoute: typeof AppRoute
     }
+    '/share/$token': {
+      id: '/share/$token'
+      path: '/share/$token'
+      fullPath: '/share/$token'
+      preLoaderRoute: typeof ShareTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -248,6 +281,13 @@ declare module '@tanstack/react-router' {
       path: '/api/film/tag'
       fullPath: '/api/film/tag'
       preLoaderRoute: typeof ApiFilmTagRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/share/cutup': {
+      id: '/api/share/cutup'
+      path: '/api/share/cutup'
+      fullPath: '/api/share/cutup'
+      preLoaderRoute: typeof ApiShareCutupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app/cutups/$cutupId': {
@@ -302,8 +342,10 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
   ApiHealthRoute: ApiHealthRoute,
+  ShareTokenRoute: ShareTokenRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiFilmTagRoute: ApiFilmTagRoute,
+  ApiShareCutupRoute: ApiShareCutupRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

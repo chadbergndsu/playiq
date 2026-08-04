@@ -22,6 +22,8 @@ export function playMatchesFilter(play: Play, filter: PlayFilter): boolean {
     if (!hit) return false;
   }
 
+  if (filter.starredOnly && !play.starred) return false;
+
   if (filter.query.trim()) {
     const q = filter.query.trim().toLowerCase();
     const hay = [
@@ -49,8 +51,20 @@ export function summarizeFilter(filter: PlayFilter): string {
   if (filter.down !== "all") parts.push(`Down ${filter.down}`);
   if (filter.concept !== "all") parts.push(filter.concept);
   if (filter.source !== "all") parts.push(`${filter.source} tags`);
+  if (filter.starredOnly) parts.push("starred");
   if (filter.query.trim()) parts.push(`“${filter.query.trim()}”`);
   return parts.length ? parts.join(" · ") : "All plays";
+}
+
+/** Distinct concept labels for filter dropdowns. */
+export function listConceptLabels(plays: Play[]): string[] {
+  const set = new Set<string>();
+  for (const p of plays) {
+    for (const t of p.tags) {
+      if (t.category === "concept") set.add(t.label);
+    }
+  }
+  return Array.from(set).sort((a, b) => a.localeCompare(b));
 }
 
 export function buildCutup(input: {

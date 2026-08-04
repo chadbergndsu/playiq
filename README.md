@@ -2,7 +2,7 @@
 
 AI-first football film analysis for coaches and programs.
 
-**Status:** Product demo live — film library, AI tagging, review workspace, cutups, insights.
+**Status:** Product demo live — film library, upload intake, AI tagging, review workspace, shareable cutups, export, tendency insights.
 
 ## Purpose
 
@@ -12,13 +12,14 @@ PlayIQ is a Hudl-style film workflow wedge: upload/review season film, get an AI
 
 | Area | What you can do |
 |------|-----------------|
-| **Landing** | Product pitch + enter film room |
+| **Landing** | Product pitch + market comparison + enter film room |
 | **Overview** | Season stats, recent film, top concepts |
-| **Film library** | 8-game demo season, search/filter by status |
-| **Film review** | Timeline, play list, demo stage, AI + coach tags, notes, keyboard J/K/Space |
+| **Film library** | Demo season + **Upload film** intake (metadata/file → processing → review) |
+| **Film review** | Timeline, deep filters (side/down/concept/source/starred), speeds 0.5–2×, AI + coach tags, notes, shortcuts (J/K/Space/S/?) |
 | **AI tagging** | **Re-run AI tags** → `POST /api/film/tag` (SpaceXAI when `XAI_API_KEY` set; heuristics otherwise). Coach tags never clobbered. |
-| **Cutups** | Filtered teach reels (save from any film filter) |
-| **Insights** | Weekly charts, concept frequency, situation counts |
+| **Cutups** | Teach reels: rename, remove plays, **share link**, CSV/JSON export |
+| **Public share** | `/share/$token` — no login required to view/export a published cutup |
+| **Insights** | Weekly charts, concepts, **formation tendencies**, 3rd-down conversion, down×distance matrix |
 | **Auth** | Better Auth (Google / X) — film room works without sign-in |
 
 Demo data is seeded client-side (persisted in the browser). **Reset demo data** on Overview restores the stock season.
