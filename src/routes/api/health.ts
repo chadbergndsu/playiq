@@ -10,7 +10,7 @@ export const Route = createFileRoute("/api/health")({
         const dbReady = await pingDatabase();
         const report = buildHealthReport({
           service: "playiq",
-          version: "1.1.1",
+          version: "1.1.2",
           dbReady,
           // Keep xAI presence internal — public report only reflects critical checks.
           // Pass a configured flag so ops tooling can still see it if they read checks,

@@ -23,11 +23,23 @@ export function secToWebVttTime(sec: number): string {
   return `${pad2(h)}:${pad2(m)}:${pad2(whole)}.${ms.toString().padStart(3, "0")}`;
 }
 
+/** Collapse WebVTT-breaking sequences (newlines, cue arrow) in free text. */
+function sanitizeVttLine(text: string, max = 120): string {
+  return text
+    .replace(/\r\n|\r|\n/g, " ")
+    .replace(/-->/g, "→")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, max);
+}
+
 function cueText(play: Play): string {
-  const concept =
+  const concept = sanitizeVttLine(
     play.tags.find((t) => t.category === "concept")?.label ??
-    play.tags.find((t) => t.category === "formation")?.label ??
-    play.side;
+      play.tags.find((t) => t.category === "formation")?.label ??
+      play.side,
+    40,
+  );
   const down =
     play.down != null ? `${play.down}&${play.distance ?? "?"}` : play.side;
   const yards =
@@ -35,7 +47,7 @@ function cueText(play: Play): string {
       ? ` ${play.yardsGained >= 0 ? "+" : ""}${play.yardsGained}`
       : "";
   const star = play.starred ? " ★" : "";
-  return `Play ${play.index} · ${down} · ${concept}${yards}${star}`;
+  return sanitizeVttLine(`Play ${play.index} · ${down} · ${concept}${yards}${star}`, 160);
 }
 
 /**
@@ -49,7 +61,7 @@ export function playsToWebVttChapters(
   const lines = ["WEBVTT"];
   if (opts.title) {
     lines.push("");
-    lines.push(`NOTE ${opts.title}`);
+    lines.push(`NOTE ${sanitizeVttLine(opts.title, 80)}`);
   }
   lines.push("");
 
@@ -58,7 +70,7 @@ export function playsToWebVttChapters(
     lines.push(String(i + 1));
     lines.push(`${secToWebVttTime(p.startSec)} --> ${secToWebVttTime(end)}`);
     lines.push(cueText(p));
-    if (p.notes?.trim()) lines.push(p.notes.trim().slice(0, 120));
+    if (p.notes?.trim()) lines.push(sanitizeVttLine(p.notes, 120));
     lines.push("");
   });
 

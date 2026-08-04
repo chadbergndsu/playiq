@@ -49,15 +49,33 @@ function CutupsPage() {
       films,
     });
     try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      try {
+        const { getBearerToken } = await import("@/lib/auth/client");
+        const bearer = getBearerToken();
+        if (bearer) headers.Authorization = `Bearer ${bearer}`;
+      } catch {
+        /* optional */
+      }
       const res = await fetch("/api/share/cutup", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
+        credentials: "include",
         body: JSON.stringify(snapshot),
       });
       const body = (await res.json().catch(() => ({}))) as {
         error?: string;
         token?: string;
+        expiresAt?: string;
       };
+      if (res.status === 401) {
+        toast.message("Sign in required to publish shares", {
+          description: "Open login, then try Share link again.",
+        });
+        return;
+      }
       if (!res.ok) {
         throw new Error(body.error || `Share failed (${res.status})`);
       }
@@ -65,7 +83,11 @@ function CutupsPage() {
       setCutupShareToken(cutupId, body.token);
       const url = `${window.location.origin}/share/${body.token}`;
       await navigator.clipboard.writeText(url);
-      toast.success("Share link copied", { description: url });
+      toast.success("Share link copied", {
+        description: body.expiresAt
+          ? `${url} · expires ${new Date(body.expiresAt).toLocaleDateString()}`
+          : url,
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Share failed";
       toast.message("Could not publish share", { description: msg });

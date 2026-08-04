@@ -1,6 +1,6 @@
 /**
  * Simple in-memory sliding-window rate limiter for public API handlers.
- * Best-effort on serverless (per isolate); still blocks bulk abuse from one instance.
+ * Best-effort on serverless (per isolate). Prefer platform-trusted client IP.
  */
 
 type Bucket = { count: number; resetAt: number };
@@ -34,14 +34,26 @@ export function checkRateLimit(
   return { ok: true, remaining: opts.limit - existing.count };
 }
 
-/** Client IP best-effort from Vercel / standard proxy headers. */
+/**
+ * Client IP best-effort.
+ * Prefer platform-set headers over client-spoofable leftmost X-Forwarded-For.
+ */
 export function clientKey(request: Request, prefix: string): string {
+  const vercel =
+    request.headers.get("x-vercel-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip")?.trim();
+  if (vercel) return `${prefix}:${vercel}`;
+
+  // When behind a single trusted proxy, the rightmost hop is often the edge IP.
+  // Prefer last public-looking hop over first (which clients can spoof).
   const xf = request.headers.get("x-forwarded-for");
-  const ip =
-    xf?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip")?.trim() ||
-    "unknown";
-  return `${prefix}:${ip}`;
+  if (xf) {
+    const parts = xf.split(",").map((s) => s.trim()).filter(Boolean);
+    const last = parts[parts.length - 1];
+    if (last) return `${prefix}:${last}`;
+  }
+
+  return `${prefix}:unknown`;
 }
 
 /** Test helper — clear buckets. */

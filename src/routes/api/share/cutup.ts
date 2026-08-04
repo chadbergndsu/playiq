@@ -1,10 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { UnauthorizedError } from "@/lib/auth/verify.server";
 import {
   loadCutupShare,
   saveCutupShare,
   ShareTokenConflictError,
 } from "@/lib/server/cutup-share";
 import { checkRateLimit, clientKey } from "@/lib/server/rate-limit";
+import {
+  requireApiUser,
+  unauthorizedJson,
+} from "@/lib/server/request-auth";
 import {
   mintShareToken,
   normalizeShareSnapshot,
@@ -31,6 +36,18 @@ export const Route = createFileRoute("/api/share/cutup")({
           );
         }
 
+        let userId: string;
+        try {
+          userId = await requireApiUser(request);
+        } catch (err) {
+          if (err instanceof UnauthorizedError) return unauthorizedJson();
+          console.error("[api/share/cutup POST auth]", err);
+          return Response.json(
+            { error: "Auth misconfigured" },
+            { status: 503, headers: { "Cache-Control": "no-store" } },
+          );
+        }
+
         let body: unknown;
         try {
           const text = await request.text();
@@ -48,7 +65,6 @@ export const Route = createFileRoute("/api/share/cutup")({
           );
         }
 
-        // Always server-mint — never trust client token for create.
         const token = mintShareToken();
         const snapshot = normalizeShareSnapshot(body, token);
         if (!snapshot) {
@@ -59,20 +75,33 @@ export const Route = createFileRoute("/api/share/cutup")({
         }
 
         try {
-          await saveCutupShare(snapshot);
+          const { expiresAt } = await saveCutupShare(snapshot, {
+            createdBy: userId,
+          });
           return Response.json(
-            { ok: true, token: snapshot.token, path: `/share/${snapshot.token}` },
+            {
+              ok: true,
+              token: snapshot.token,
+              path: `/share/${snapshot.token}`,
+              expiresAt,
+            },
             { headers: { "Cache-Control": "no-store" } },
           );
         } catch (err) {
           if (err instanceof ShareTokenConflictError) {
-            // Astronomically rare with CSPRNG; mint once more.
             const retryToken = mintShareToken();
             const retry = { ...snapshot, token: retryToken };
             try {
-              await saveCutupShare(retry);
+              const { expiresAt } = await saveCutupShare(retry, {
+                createdBy: userId,
+              });
               return Response.json(
-                { ok: true, token: retry.token, path: `/share/${retry.token}` },
+                {
+                  ok: true,
+                  token: retry.token,
+                  path: `/share/${retry.token}`,
+                  expiresAt,
+                },
                 { headers: { "Cache-Control": "no-store" } },
               );
             } catch {

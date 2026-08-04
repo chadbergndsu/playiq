@@ -25,7 +25,7 @@ export const Route = createFileRoute("/app/film/$filmId")({
 
 type TagApiResponse = {
   filmId: string;
-  mode: "llm" | "heuristic";
+  mode: "ok" | "llm" | "heuristic";
   xaiConfigured: boolean;
   playTags: Record<string, PlayTag[]>;
   warning?: string;
@@ -36,9 +36,20 @@ async function requestFilmTags(
   filmId: string,
   plays: ReturnType<typeof playsForFilm>,
 ): Promise<TagApiResponse> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  try {
+    const { getBearerToken } = await import("@/lib/auth/client");
+    const bearer = getBearerToken();
+    if (bearer) headers.Authorization = `Bearer ${bearer}`;
+  } catch {
+    /* client auth optional */
+  }
   const res = await fetch("/api/film/tag", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
+    credentials: "include",
     body: JSON.stringify({
       filmId,
       plays: plays.map((p) => ({
@@ -50,7 +61,6 @@ async function requestFilmTags(
         yardsGained: p.yardsGained,
         result: p.result,
         notes: p.notes,
-        tags: p.tags,
       })),
     }),
   });
@@ -311,14 +321,10 @@ function FilmReviewPage() {
                 try {
                   const data = await requestFilmTags(film.id, plays);
                   applyAiTagsForFilm(film.id, data.playTags);
-                  const via =
-                    data.mode === "llm"
-                      ? "SpaceXAI (xAI) tags applied"
-                      : "Local heuristic tags applied";
                   toast.success("AI re-analysis complete", {
                     description: data.warning
-                      ? `${via}. ${data.warning} Coach tags preserved.`
-                      : `${via}. Coach tags preserved.`,
+                      ? `${data.warning} Coach tags preserved.`
+                      : "Tags applied. Coach tags preserved.",
                   });
                 } catch (err) {
                   reanalyzeFilm(film.id);

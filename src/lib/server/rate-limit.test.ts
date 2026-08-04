@@ -35,9 +35,19 @@ describe("checkRateLimit", () => {
 });
 
 describe("clientKey", () => {
-  it("prefers x-forwarded-for first hop", () => {
+  it("prefers x-vercel-forwarded-for over x-forwarded-for", () => {
     const req = new Request("https://example.com", {
-      headers: { "x-forwarded-for": "1.2.3.4, 5.6.7.8" },
+      headers: {
+        "x-forwarded-for": "9.9.9.9, 8.8.8.8",
+        "x-vercel-forwarded-for": "1.2.3.4",
+      },
+    });
+    assert.equal(clientKey(req, "share"), "share:1.2.3.4");
+  });
+
+  it("uses rightmost x-forwarded-for hop when no platform header", () => {
+    const req = new Request("https://example.com", {
+      headers: { "x-forwarded-for": "9.9.9.9, 1.2.3.4" },
     });
     assert.equal(clientKey(req, "share"), "share:1.2.3.4");
   });

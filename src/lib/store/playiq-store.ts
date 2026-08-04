@@ -458,7 +458,8 @@ export const usePlayiqStore = create<PlayiqState>()(
       partialize: (s) => ({
         films: s.films,
         playsByFilm: s.playsByFilm,
-        cutups: s.cutups,
+        // Do not persist share tokens — capability secrets should not live in localStorage.
+        cutups: s.cutups.map(({ shareToken: _t, ...c }) => c),
       }),
     },
   ),

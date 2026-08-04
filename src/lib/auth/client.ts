@@ -128,11 +128,7 @@ export async function signIn(
       /* session store will recover on next useSession fetch */
     }
     if (typeof window !== "undefined") {
-      const dest = new URL(callbackURL, window.location.origin);
-      const here = window.location;
-      if (dest.origin !== here.origin || dest.pathname !== here.pathname || dest.search !== here.search) {
-        window.location.href = callbackURL;
-      }
+      navigateSameOrigin(callbackURL);
     }
     return;
   }
@@ -143,7 +139,32 @@ export async function signIn(
     errorCallbackURL,
   });
   if (error) throw new Error(error.message ?? "Sign-in failed");
-  if (data?.url) window.location.href = data.url;
+  if (data?.url) {
+    // Broker URL is external by design (OAuth authorize).
+    window.location.href = data.url;
+  }
+}
+
+/** Only same-origin paths may be used for post-auth / sign-out redirects. */
+export function safeSameOriginPath(urlOrPath: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const dest = new URL(urlOrPath, window.location.origin);
+    if (dest.origin !== window.location.origin) return null;
+    return `${dest.pathname}${dest.search}${dest.hash}` || "/";
+  } catch {
+    return null;
+  }
+}
+
+function navigateSameOrigin(urlOrPath: string): void {
+  if (typeof window === "undefined") return;
+  const path = safeSameOriginPath(urlOrPath);
+  if (!path) return;
+  const here = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (path !== here) {
+    window.location.href = path;
+  }
 }
 
 /**
@@ -207,5 +228,6 @@ export async function signOut(redirectTo = "/"): Promise<void> {
   } finally {
     setBearerToken(null);
   }
-  window.location.href = redirectTo;
+  const path = safeSameOriginPath(redirectTo) ?? "/";
+  window.location.href = path;
 }

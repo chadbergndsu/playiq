@@ -7,7 +7,8 @@ import {
 } from "@/lib/core/llm-tagging";
 import type { Down, Play, Side } from "@/lib/core/types";
 import { checkRateLimit, clientKey } from "@/lib/server/rate-limit";
-import { tagPlays } from "@/lib/server/xai-tagger";
+import { resolveApiUser } from "@/lib/server/request-auth";
+import { isXaiConfigured, tagPlays } from "@/lib/server/xai-tagger";
 
 type ClientPlayInput = {
   id: string;
@@ -18,7 +19,6 @@ type ClientPlayInput = {
   yardsGained?: number;
   result?: Play["result"];
   notes?: string;
-  tags?: Play["tags"];
   visionHint?: string;
 };
 
@@ -69,6 +69,7 @@ export function parseFilmTagBody(raw: unknown): {
       dropped += 1;
       continue;
     }
+    // Intentionally ignore client `tags` — untrusted; server rebuilds signals.
     plays.push({
       id: p.id,
       side: p.side,
@@ -84,7 +85,6 @@ export function parseFilmTagBody(raw: unknown): {
           ? (p.result.slice(0, 32) as Play["result"])
           : undefined,
       notes: clampVisionHint(typeof p.notes === "string" ? p.notes : undefined),
-      tags: Array.isArray(p.tags) ? (p.tags as Play["tags"]).slice(0, 24) : undefined,
       visionHint: clampVisionHint(
         typeof p.visionHint === "string" ? p.visionHint : undefined,
       ),
@@ -113,13 +113,29 @@ function toRequests(plays: ClientPlayInput[]): PlayTagRequest[] {
       yardsGained: p.yardsGained,
       result: p.result,
       notes: p.notes,
-      tags: p.tags ?? [],
+      tags: [],
     };
     return {
       playId: p.id,
       signal: playToSignal(asPlay, p.visionHint),
     };
   });
+}
+
+/** Coach-safe public warning — never mention API keys or provider details. */
+function publicWarning(
+  internal: string | undefined,
+  dropped: number,
+  usedHeuristicOnly: boolean,
+): string | undefined {
+  const parts: string[] = [];
+  if (usedHeuristicOnly) {
+    parts.push("Used local analysis rules (sign in for live AI when configured).");
+  } else if (internal) {
+    parts.push("Some plays used local rules after analysis issues.");
+  }
+  if (dropped > 0) parts.push(`${dropped} invalid play row(s) ignored.`);
+  return parts.length ? parts.join(" ") : undefined;
 }
 
 export const Route = createFileRoute("/api/film/tag")({
@@ -140,6 +156,20 @@ export const Route = createFileRoute("/api/film/tag")({
                 "Cache-Control": "no-store",
               },
             },
+          );
+        }
+
+        // Paid LLM only for signed-in users when auth is on.
+        // Auth-off local demo (no DATABASE_URL): treat as signed-in (DEV_USER).
+        let allowLlm = false;
+        try {
+          const { userId, authOn } = await resolveApiUser(request);
+          allowLlm = authOn ? Boolean(userId) : Boolean(userId);
+        } catch (err) {
+          console.error("[api/film/tag auth]", err);
+          return Response.json(
+            { error: "Auth misconfigured" },
+            { status: 503, headers: { "Cache-Control": "no-store" } },
           );
         }
 
@@ -172,20 +202,23 @@ export const Route = createFileRoute("/api/film/tag")({
         }
 
         try {
-          const tagged = await tagPlays(toRequests(parsed.plays));
-          const dropWarn =
-            parsed.dropped > 0
-              ? `${parsed.dropped} invalid play row(s) ignored.`
-              : undefined;
-          const warning = [tagged.warning, dropWarn].filter(Boolean).join(" ") || undefined;
+          // Never call paid LLM for anonymous sessions when a key is configured.
+          const forceHeuristic = isXaiConfigured() && !allowLlm;
+          const tagged = await tagPlays(toRequests(parsed.plays), {
+            forceHeuristic,
+          });
           return Response.json(
             {
               filmId: parsed.filmId,
-              mode: tagged.mode,
-              // Do not advertise whether the paid key is present on public responses.
+              // Opaque public mode — do not reveal llm vs heuristic for recon.
+              mode: "ok",
               xaiConfigured: false,
               playTags: resultsToTagMap(tagged.results),
-              warning,
+              warning: publicWarning(
+                tagged.warning,
+                parsed.dropped,
+                forceHeuristic || tagged.mode === "heuristic",
+              ),
             },
             {
               status: 200,

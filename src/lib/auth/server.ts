@@ -79,6 +79,27 @@ const grokIssuer = env("GROK_AUTH_ISSUER") ?? GROK_ISSUER_DEFAULT;
 const grokClientId = env("GROK_AUTH_CLIENT_ID") ?? PREVIEW_CLIENT_ID;
 const grokClientSecret = env("GROK_AUTH_CLIENT_SECRET") ?? PREVIEW_CLIENT_SECRET;
 
+const databaseUrlForAuth = env("DATABASE_URL");
+const usingPreviewOAuth =
+  grokClientId === PREVIEW_CLIENT_ID ||
+  grokClientSecret === PREVIEW_CLIENT_SECRET;
+
+// Fail closed on Vercel production: never sign sessions with preview OAuth or a
+// missing secret when a real Postgres is configured.
+if (!authDisabled && databaseUrlForAuth) {
+  const missingSecret = !env("BETTER_AUTH_SECRET");
+  if (missingSecret || usingPreviewOAuth) {
+    const msg = missingSecret
+      ? "[auth] BETTER_AUTH_SECRET is required when DATABASE_URL is set"
+      : "[auth] Set GROK_AUTH_CLIENT_ID and GROK_AUTH_CLIENT_SECRET — " +
+        "the baked preview OAuth client is not allowed with DATABASE_URL";
+    if (env("VERCEL_ENV") === "production") {
+      throw new Error(msg);
+    }
+    console.error(msg);
+  }
+}
+
 /** True when federated sign-in is active (real auth is enforced). */
 export const authConfigured =
   !authDisabled && Boolean(grokClientId && grokClientSecret);
@@ -171,8 +192,8 @@ const grokOAuthPlugin = authConfigured
 
 export const auth = betterAuth({
   baseURL,
-  // Deployed apps inject BETTER_AUTH_SECRET. Preview: process-stable secret on
-  // globalThis so HMR doesn't invalidate PGLite-backed sessions (see above).
+  // Deployed apps inject BETTER_AUTH_SECRET (required above when DATABASE_URL is set).
+  // Preview / no DB: process-stable secret on globalThis so HMR keeps sessions.
   secret: env("BETTER_AUTH_SECRET") ?? previewAuthSecret(),
   database,
 
