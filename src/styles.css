@@ -1,0 +1,38 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-brand-50: #eef8ff;
+  --color-brand-100: #d9efff;
+  --color-brand-500: #0b6bcb;
+  --color-brand-600: #0854a0;
+  --color-brand-700: #06407a;
+  --color-ink: #0b1220;
+  --color-muted: #5b6577;
+  --color-surface: #f6f8fb;
+  --color-card: #ffffff;
+  --color-line: #e2e8f0;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    font-family: var(--font-sans);
+    color: var(--color-ink);
+    background:
+      radial-gradient(1200px 600px at 10% -10%, #dbeafe 0%, transparent 55%),
+      radial-gradient(900px 500px at 100% 0%, #e0f2fe 0%, transparent 45%),
+      var(--color-surface);
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
