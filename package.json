@@ -58,7 +58,7 @@
     "date-fns": "^4.0.0",
     "kysely": "^0.28.5",
     "lucide-react": "^0.577.0",
-    "mediabunny": "^1.52.3",
+    "mediabunny": "^1.53.0",
     "pg": "^8.16.3",
     "react": "^19.1.0",
     "react-day-picker": "^9.14.0",
