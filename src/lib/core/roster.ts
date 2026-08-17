@@ -15,7 +15,7 @@ export type RosterPlayer = {
 export const TEAM_ROSTER: RosterPlayer[] = [];
 
 /** @deprecated Use TEAM_ROSTER */
-export const TIGERS_3RD_ROSTER = TEAM_ROSTER;
+export const LEGACY_TEAM_ROSTER = TEAM_ROSTER;
 
 const byNumber = new Map(TEAM_ROSTER.map((p) => [p.number, p]));
 

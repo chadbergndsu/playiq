@@ -57,7 +57,7 @@ describe("vision pipeline", () => {
         level: "youth",
         durationSec: 60,
         status: "needs_review",
-        sourceFileName: "gilmer.mp4",
+        sourceFileName: "week1-game.mp4",
       },
       frames,
       seed: 1,

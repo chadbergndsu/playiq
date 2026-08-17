@@ -23,7 +23,7 @@ export const SCHEDULE_POSTER_URL: string | null = null;
 export const TEAM_SCHEDULE: ScheduleGame[] = [];
 
 /** @deprecated Use TEAM_SCHEDULE */
-export const TIGERS_3RD_SCHEDULE = TEAM_SCHEDULE;
+export const LEGACY_TEAM_SCHEDULE = TEAM_SCHEDULE;
 
 export function nextGame(
   schedule: ScheduleGame[] = TEAM_SCHEDULE,
