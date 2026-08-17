@@ -1,0 +1,140 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@theme {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Barlow Condensed", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  /* Near-neutral dark film room */
+  --color-bg: #0a0b0d;
+  --color-bg-elevated: #12141a;
+  --color-bg-subtle: #1a1d26;
+  --color-fg: #eceef2;
+  --color-fg-muted: #9aa3b2;
+  --color-fg-subtle: #6b7382;
+  --color-border: #2a2f3a;
+  --color-border-strong: #3d4454;
+
+  /* Single restrained cool accent */
+  --color-accent: #c5ccd8;
+  --color-accent-fg: #0a0b0d;
+  --color-accent-soft: #1e2430;
+
+  /* Semantic — badges only */
+  --color-success: #5d9b7a;
+  --color-warn: #b8956a;
+  --color-danger: #c47a7a;
+
+  /* Legacy aliases used by auth chrome during transition */
+  --color-brand-50: #1e2430;
+  --color-brand-100: #2a3140;
+  --color-brand-500: #9aa3b2;
+  --color-brand-600: #c5ccd8;
+  --color-brand-700: #eceef2;
+  --color-ink: #eceef2;
+  --color-muted: #9aa3b2;
+  --color-surface: #12141a;
+  --color-card: #12141a;
+  --color-line: #2a2f3a;
+
+  --radius-xs: 0.25rem;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+
+  --shadow-panel: 0 1px 0 color-mix(in oklab, var(--color-fg) 6%, transparent),
+    0 12px 40px color-mix(in oklab, #000 45%, transparent);
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    font-family: var(--font-sans);
+    color: var(--color-fg);
+    background: var(--color-bg);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-accent) 35%, transparent);
+    color: var(--color-fg);
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .panel {
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-panel);
+  }
+
+  .hairline {
+    border-color: var(--color-border);
+  }
+
+  .focus-ring {
+    outline: none;
+  }
+  .focus-ring:focus-visible {
+    outline: 2px solid color-mix(in oklab, var(--color-accent) 70%, transparent);
+    outline-offset: 2px;
+  }
+
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in oklab, var(--color-fg) 8%, transparent) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.4s linear infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: 100% 0;
+    }
+    100% {
+      background-position: -100% 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .shimmer {
+      animation: none;
+    }
+    .motion-safe-fade {
+      transition: none !important;
+    }
+  }
+
+  .motion-safe-fade {
+    transition:
+      opacity 250ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 250ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}

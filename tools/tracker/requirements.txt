@@ -1,0 +1,7 @@
+easyocr
+fastapi
+opencv-python-headless
+python-multipart
+torch
+ultralytics
+uvicorn
