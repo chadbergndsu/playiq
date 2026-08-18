@@ -61,7 +61,7 @@
     "kysely": "^0.28.5",
     "lucide-react": "^0.577.0",
     "mediabunny": "^1.52.3",
-    "pg": "^8.16.3",
+    "pg": "^8.23.0",
     "react": "^19.1.0",
     "react-day-picker": "^9.14.0",
     "react-dom": "^19.1.0",
@@ -79,7 +79,7 @@
   "devDependencies": {
     "@eslint/js": "^9.20.0",
     "@types/node": "^22.16.5",
-    "@types/pg": "^8.11.10",
+    "@types/pg": "^8.21.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^5.0.0",
